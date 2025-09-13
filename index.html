@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cardlayer - A4 Image Positioning Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        
+        .drag-over {
+            border-color: #3b82f6 !important;
+            background-color: rgba(59, 130, 246, 0.1);
+        }
+        
+        .dragging {
+            z-index: 50;
+            transform: rotate(2deg);
+            opacity: 0.8;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        
+        /* Resize functionality removed per application.mdc - users cannot resize images */
+        
+        .remove-btn {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 24px;
+            height: 24px;
+            background: #ef4444;
+            color: white;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        
+        .image-container:hover .remove-btn {
+            opacity: 1;
+        }
+        
+        .grid-pattern {
+            background-image: 
+                linear-gradient(rgba(0,0,0,0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,0,0,0.1) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        
+        .image-rotated {
+            transform: rotate(90deg);
+        }
+        
+        .control-top-left {
+            position: absolute;
+            z-index: 10;
+        }
+        
+        .control-top-right {
+            position: absolute;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="app" class="h-screen w-screen flex flex-row overflow-hidden">
+        <!-- Tool Layout - 30% left vertical screen -->
+        <div class="w-3/10 min-w-[300px] bg-blue-50 border-r-4 border-blue-300 flex flex-col">
+            <div class="p-4 border-b border-gray-200">
+                <h1 class="text-lg font-bold text-gray-900">Cardlayer</h1>
+                <p class="text-sm text-gray-500">A4 Image Positioning Tool</p>
+                <div class="mt-2 px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded">Tools & Controls</div>
+            </div>
+            
+            <div class="flex-1 p-4 space-y-4">
+                <!-- Card Count -->
+                <div class="bg-gray-50 rounded-lg p-3">
+                    <h3 class="text-sm font-semibold text-gray-900 mb-2">Cards</h3>
+                    <div id="imageCount" class="text-2xl font-bold text-blue-600">0</div>
+                    <div class="text-xs text-gray-500">imported</div>
+                </div>
+
+                <!-- File Importer -->
+                <div class="bg-gray-50 rounded-lg p-3">
+                    <h3 class="text-sm font-semibold text-gray-900 mb-2">Import Cards</h3>
+                    <input type="file" id="fileInput" accept="image/*" multiple class="hidden">
+                    <button id="importBtn" class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                        🃏 Import Cards
+                    </button>
+                    <div class="text-xs text-gray-500 text-center mt-2">
+                        Auto-detects orientation
+                    </div>
+                </div>
+
+                <!-- PDF Generation -->
+                <div class="bg-gray-50 rounded-lg p-3">
+                    <h3 class="text-sm font-semibold text-gray-900 mb-2">Export</h3>
+                    <button id="generatePdfBtn" class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed" disabled>
+                        📄 Generate PDF
+                    </button>
+                    <div id="pdfStatus" class="text-xs text-gray-500 text-center mt-2">
+                        Add cards first
+                    </div>
+                </div>
+
+                <!-- Clear All -->
+                <button id="clearAllBtn" class="w-full px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors hidden">
+                    Clear All Cards
+                </button>
+
+                <!-- Instructions -->
+                <div class="bg-gray-50 rounded-lg p-3">
+                    <h3 class="text-sm font-semibold text-gray-900 mb-2">Instructions</h3>
+                    <div class="text-xs text-gray-600 space-y-1">
+                        <p>• Import card images (63.5×88mm)</p>
+                        <p>• Auto-detects card orientation</p>
+                        <p>• <strong>A4 Layout:</strong> Drag & rotate only</p>
+                        <p>• Cards cannot stack or overlap</p>
+                        <p>• Double-click or click ↻ to rotate</p>
+                        <p>• Click × to remove cards</p>
+                        <p>• Generate PDF when ready</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- A4 View Layout - 70% right vertical screen -->
+        <div class="w-7/10 min-w-[500px] bg-yellow-50 flex flex-col">
+            <div class="p-4 border-b border-gray-200">
+                <h2 class="text-lg font-semibold text-gray-900">A4 Layout (Horizontal)</h2>
+                <p class="text-sm text-gray-500">Position cards freely (no stacking)</p>
+                <div class="mt-2 px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded">297×210mm • Free Positioning</div>
+            </div>
+            <div class="flex-1 flex items-center justify-center p-2">
+                <div id="a4Container" class="bg-white shadow-2xl rounded-lg overflow-hidden">
+                    <div id="a4Canvas" class="relative border-2 border-dashed border-gray-300 transition-colors duration-200 grid-pattern">
+                        <!-- A4 Background Grid -->
+                        <div class="absolute inset-0 opacity-10">
+                            <svg width="100%" height="100%" class="w-full h-full">
+                                <defs>
+                                    <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+                                        <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e5e7eb" strokeWidth="1"/>
+                                    </pattern>
+                                </defs>
+                                <rect width="100%" height="100%" fill="url(#grid)" />
+                            </svg>
+                        </div>
+
+                        <!-- Drop Zone Overlay -->
+                        <div id="dropOverlay" class="absolute inset-0 bg-blue-50 bg-opacity-50 flex items-center justify-center hidden">
+                            <div class="text-blue-600 text-lg font-medium">
+                                Drop image here
+                            </div>
+                        </div>
+
+                        <!-- Empty State -->
+                        <div id="a4EmptyState" class="absolute inset-0 flex items-center justify-center">
+                            <div class="text-center text-gray-500">
+                                <div class="text-4xl mb-4">📄</div>
+                                <div class="text-lg font-medium">A4 Document (Horizontal)</div>
+                                <div class="text-sm">Drag and drop cards here to position them</div>
+                                <div class="text-xs mt-2">Cards will be sized to 63.5×88mm</div>
+                                <div id="a4DebugInfo" class="text-xs mt-2 text-blue-600 hidden">
+                                    <!-- Debug info will be shown here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // A4 dimensions in mm (horizontal/landscape mode)
+        const A4_WIDTH_MM = 297;  // Landscape width
+        const A4_HEIGHT_MM = 210; // Landscape height
+        const DPI = 96;
+        
+        // Card dimensions in mm
+        const CARD_WIDTH_MM = 63.5;
+        const CARD_HEIGHT_MM = 88;
+
+        // Convert mm to pixels
+        function mmToPixels(mm) {
+            return (mm * DPI) / 25.4;
+        }
+
+        // Convert pixels to mm
+        function pixelsToMm(pixels) {
+            return (pixels * 25.4) / DPI;
+        }
+
+        // Detect card orientation and calculate proper dimensions
+        function calculateCardDimensions(originalWidth, originalHeight) {
+            const aspectRatio = originalWidth / originalHeight;
+            const cardAspectRatio = CARD_WIDTH_MM / CARD_HEIGHT_MM;
+            
+            let isRotated = false;
+            let cardWidth, cardHeight;
+            
+            // Determine if card should be rotated based on aspect ratio
+            if (Math.abs(aspectRatio - cardAspectRatio) > Math.abs(aspectRatio - (1/cardAspectRatio))) {
+                // Card should be rotated (88mm x 63.5mm)
+                isRotated = true;
+                cardWidth = CARD_HEIGHT_MM;
+                cardHeight = CARD_WIDTH_MM;
+            } else {
+                // Card in normal orientation (63.5mm x 88mm)
+                isRotated = false;
+                cardWidth = CARD_WIDTH_MM;
+                cardHeight = CARD_HEIGHT_MM;
+            }
+            
+            // Convert to pixels for display
+            const cardWidthPx = mmToPixels(cardWidth);
+            const cardHeightPx = mmToPixels(cardHeight);
+            
+            return {
+                width: cardWidthPx,
+                height: cardHeightPx,
+                isRotated: isRotated,
+                originalWidth: originalWidth,
+                originalHeight: originalHeight
+            };
+        }
+
+        // Check for collision between two cards
+        function checkCollision(card1, card2) {
+            return !(card1.x + card1.width <= card2.x || 
+                    card2.x + card2.width <= card1.x || 
+                    card1.y + card1.height <= card2.y || 
+                    card2.y + card2.height <= card1.y);
+        }
+
+        // Check if a position is valid (no collisions)
+        function isValidPosition(newImage, newX, newY) {
+            const testImage = { ...newImage, x: newX, y: newY };
+            
+            for (const otherImage of images) {
+                if (otherImage.id !== newImage.id && checkCollision(testImage, otherImage)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        // Find nearest valid position
+        function findNearestValidPosition(image, targetX, targetY) {
+            const step = 10; // Search step size
+            const maxAttempts = 50;
+            
+            // Try exact position first
+            if (isValidPosition(image, targetX, targetY)) {
+                return { x: targetX, y: targetY };
+            }
+            
+            // Search in expanding spiral
+            for (let radius = step; radius <= step * maxAttempts; radius += step) {
+                const positions = [
+                    { x: targetX, y: targetY - radius }, // up
+                    { x: targetX + radius, y: targetY }, // right
+                    { x: targetX, y: targetY + radius }, // down
+                    { x: targetX - radius, y: targetY }, // left
+                ];
+                
+                for (const pos of positions) {
+                    // Constrain to A4 bounds
+                    const constrainedX = Math.max(0, Math.min(pos.x, a4Dimensions.width - image.width));
+                    const constrainedY = Math.max(0, Math.min(pos.y, a4Dimensions.height - image.height));
+                    
+                    if (isValidPosition(image, constrainedX, constrainedY)) {
+                        return { x: constrainedX, y: constrainedY };
+                    }
+                }
+            }
+            
+            // If no valid position found, return original position
+            return { x: image.x, y: image.y };
+        }
+
+        // Global state
+        let images = [];
+        let isDragging = false;
+        let dragStart = { x: 0, y: 0 };
+        let currentImage = null;
+        let currentDragArea = null; // 'import' or 'a4'
+        let a4Dimensions = { width: 0, height: 0, scale: 1 };
+
+        // DOM elements
+        const fileInput = document.getElementById('fileInput');
+        const importBtn = document.getElementById('importBtn');
+        const generatePdfBtn = document.getElementById('generatePdfBtn');
+        const clearAllBtn = document.getElementById('clearAllBtn');
+        const imageCount = document.getElementById('imageCount');
+        const pdfStatus = document.getElementById('pdfStatus');
+        const a4Canvas = document.getElementById('a4Canvas');
+        const dropOverlay = document.getElementById('dropOverlay');
+        const a4EmptyState = document.getElementById('a4EmptyState');
+        // Gallery elements removed per application.mdc - 2-section layout only
+
+        // Initialize A4 dimensions
+        function initA4Dimensions() {
+            // Get available space for A4 layout (70% of screen width, full height minus padding)
+            const containerWidth = window.innerWidth * 0.7 - 32; // 70% minus minimal padding
+            const containerHeight = window.innerHeight - 32; // Full height minus minimal padding
+            
+            // A4 dimensions in pixels (horizontal: 297mm x 210mm)
+            const baseWidth = mmToPixels(A4_WIDTH_MM);  // 297mm
+            const baseHeight = mmToPixels(A4_HEIGHT_MM); // 210mm
+            
+            // Calculate scale to fit A4 in available space while maintaining aspect ratio
+            const scaleX = containerWidth / baseWidth;
+            const scaleY = containerHeight / baseHeight;
+            const scale = Math.min(scaleX, scaleY); // Allow scaling up to fill space
+            
+            // Calculate final dimensions
+            const finalWidth = baseWidth * scale;
+            const finalHeight = baseHeight * scale;
+            
+            a4Dimensions = {
+                width: finalWidth,
+                height: finalHeight,
+                scale: scale,
+                baseWidth: baseWidth,
+                baseHeight: baseHeight
+            };
+            
+            // Apply dimensions to canvas
+            a4Canvas.style.width = finalWidth + 'px';
+            a4Canvas.style.height = finalHeight + 'px';
+            
+            console.log('A4 Layout initialized:', {
+                containerSize: { width: containerWidth, height: containerHeight },
+                baseSize: { width: baseWidth, height: baseHeight },
+                finalSize: { width: finalWidth, height: finalHeight },
+                scale: scale,
+                aspectRatio: finalWidth / finalHeight,
+                expectedAspectRatio: A4_WIDTH_MM / A4_HEIGHT_MM
+            });
+            
+            // Show debug info in the UI
+            const debugInfo = document.getElementById('a4DebugInfo');
+            if (debugInfo) {
+                const aspectRatio = (finalWidth / finalHeight).toFixed(3);
+                const expectedRatio = (A4_WIDTH_MM / A4_HEIGHT_MM).toFixed(3);
+                const isCorrectRatio = Math.abs(aspectRatio - expectedRatio) < 0.01;
+                
+                debugInfo.innerHTML = `
+                    <div>Scale: ${(scale * 100).toFixed(1)}%</div>
+                    <div>Size: ${Math.round(finalWidth)}×${Math.round(finalHeight)}px</div>
+                    <div>Ratio: ${aspectRatio} ${isCorrectRatio ? '✓' : '✗'}</div>
+                `;
+                debugInfo.classList.remove('hidden');
+            }
+        }
+
+        // Create image element for A4 layout
+        function createImageElement(image) {
+            const container = document.createElement('div');
+            container.className = 'image-container absolute cursor-move select-none group';
+            container.style.left = image.x + 'px';
+            container.style.top = image.y + 'px';
+            container.style.width = image.width + 'px';
+            container.style.height = image.height + 'px';
+            container.dataset.imageId = image.id;
+
+            const img = document.createElement('img');
+            img.src = image.src;
+            img.alt = image.name;
+            img.className = `w-full h-full object-cover rounded border-2 border-transparent group-hover:border-blue-400 transition-colors ${image.isRotated ? 'image-rotated' : ''}`;
+            img.draggable = false;
+            
+            // Ensure image fills container properly
+            img.style.width = '100%';
+            img.style.height = '100%';
+            img.style.objectFit = 'cover';
+            
+            // For rotated images, ensure the rotation is applied
+            if (image.isRotated) {
+                img.style.transform = 'rotate(90deg)';
+            }
+
+            // Calculate control positions based on rotation
+            const getControlPositions = (isRotated, containerWidth, containerHeight) => {
+                if (isRotated) {
+                    // When rotated 90°, the "top-most part" of the image is now the left side
+                    // Controls should be positioned at the left and right sides of the container
+                    // (which correspond to the top-left and top-right of the rotated image)
+                    return {
+                        topLeft: { top: '50%', left: '4px', transform: 'translateY(-50%)' },      // Left side of container (top of rotated image)
+                        topRight: { top: '50%', right: '4px', transform: 'translateY(-50%)' }     // Right side of container (top of rotated image)
+                    };
+                } else {
+                    // Normal orientation - controls at top-left and top-right
+                    return {
+                        topLeft: { top: '4px', left: '4px' },
+                        topRight: { top: '4px', right: '4px' }
+                    };
+                }
+            };
+
+            const controlPositions = getControlPositions(image.isRotated, image.width, image.height);
+
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'remove-btn control-top-right';
+            removeBtn.style.top = controlPositions.topRight.top;
+            removeBtn.style.right = controlPositions.topRight.right;
+            if (controlPositions.topRight.transform) {
+                removeBtn.style.transform = controlPositions.topRight.transform;
+            }
+            removeBtn.innerHTML = '×';
+            removeBtn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                removeImage(image.id);
+            };
+            removeBtn.onmousedown = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            };
+
+            // Resize functionality removed per application.mdc
+
+            // Add rotation indicator
+            const rotationIndicator = document.createElement('div');
+            rotationIndicator.className = 'control-top-left bg-blue-500 text-white text-xs px-1 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:bg-blue-600 select-none';
+            rotationIndicator.style.top = controlPositions.topLeft.top;
+            rotationIndicator.style.left = controlPositions.topLeft.left;
+            if (controlPositions.topLeft.transform) {
+                rotationIndicator.style.transform = controlPositions.topLeft.transform;
+            }
+            rotationIndicator.textContent = image.isRotated ? '↻' : '↻';
+            rotationIndicator.title = image.isRotated ? 'Click to rotate back (88×63.5mm)' : 'Click to rotate (63.5×88mm)';
+            rotationIndicator.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Rotation indicator clicked', { imageId: image.id });
+                rotateImage(image.id);
+            };
+            rotationIndicator.onmousedown = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            };
+
+            container.appendChild(img);
+            container.appendChild(removeBtn);
+            container.appendChild(rotationIndicator);
+
+            // Add drag functionality for A4 layout
+            container.onmousedown = (e) => {
+                // Don't start drag if clicking on remove button
+                if (e.target.classList.contains('remove-btn')) {
+                    return;
+                }
+                
+                e.preventDefault();
+                console.log('A4 image mousedown triggered', { imageId: image.id, clientX: e.clientX, clientY: e.clientY, target: e.target.className });
+                startDrag(image, e);
+            };
+            
+            console.log('A4 image element created with event handlers', { 
+                imageId: image.id, 
+                hasOnmousedown: !!container.onmousedown,
+                hasOndblclick: !!container.ondblclick,
+                className: container.className 
+            });
+            
+            // Add double-click to rotate
+            container.ondblclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('A4 image double-clicked for rotation', { imageId: image.id });
+                rotateImage(image.id);
+            };
+
+            return container;
+        }
+
+        // Gallery functionality removed per application.mdc - 2-section layout only
+
+        // Start dragging
+        function startDrag(image, e) {
+            console.log('startDrag called', { imageId: image.id, isDragging, clientX: e.clientX, clientY: e.clientY });
+            isDragging = true;
+            currentImage = image;
+            
+            // Determine drag area based on where the drag started
+            const a4Rect = a4Canvas.getBoundingClientRect();
+            const isInA4 = e.clientX >= a4Rect.left && e.clientX <= a4Rect.right && 
+                          e.clientY >= a4Rect.top && e.clientY <= a4Rect.bottom;
+            
+            currentDragArea = isInA4 ? 'a4' : 'import';
+            
+            // Calculate drag start offset relative to the image position
+            const imageRect = {
+                left: a4Rect.left + image.x,
+                top: a4Rect.top + image.y
+            };
+            
+            dragStart = {
+                x: e.clientX - imageRect.left,
+                y: e.clientY - imageRect.top
+            };
+            
+            // Add visual feedback
+            const element = document.querySelector(`[data-image-id="${image.id}"]`);
+            if (element) {
+                element.classList.add('dragging');
+            }
+            
+            document.addEventListener('mousemove', handleDrag);
+            document.addEventListener('mouseup', stopDrag);
+        }
+
+        // Handle dragging
+        function handleDrag(e) {
+            console.log('handleDrag called', { isDragging, currentImage: currentImage?.id, clientX: e.clientX, clientY: e.clientY });
+            if (!isDragging || !currentImage) return;
+            
+            const newX = e.clientX - dragStart.x;
+            const newY = e.clientY - dragStart.y;
+            
+            // Only handle A4 canvas dragging now
+            if (currentDragArea === 'a4' || !currentDragArea) {
+                // Moving within A4 area - convert to relative coordinates
+                const a4Rect = a4Canvas.getBoundingClientRect();
+                const relativeX = newX - a4Rect.left;
+                const relativeY = newY - a4Rect.top;
+                
+                // Use actual dimensions since we now properly swap them in rotateImage
+                const constrainedX = Math.max(0, Math.min(relativeX, a4Dimensions.width - currentImage.width));
+                const constrainedY = Math.max(0, Math.min(relativeY, a4Dimensions.height - currentImage.height));
+            
+            // Check for collisions with other cards (no stacking)
+            const finalX = checkCollisions(constrainedX, constrainedY, currentImage.id);
+            
+            currentImage.x = finalX;
+            currentImage.y = constrainedY;
+            
+            const element = document.querySelector(`[data-image-id="${currentImage.id}"]`);
+            if (element) {
+                element.style.left = finalX + 'px';
+                element.style.top = constrainedY + 'px';
+                }
+            }
+        }
+
+        // Check for collisions and prevent stacking
+        function checkCollisions(x, y, currentId) {
+            const currentCard = images.find(img => img.id === currentId);
+            if (!currentCard) return x;
+            
+            // Use actual dimensions since we now properly swap them in rotateImage
+            const currentDims = {
+                width: currentCard.width,
+                height: currentCard.height
+            };
+            
+            for (const otherCard of images) {
+                if (otherCard.id === currentId) continue;
+                
+                const otherDims = {
+                    width: otherCard.width,
+                    height: otherCard.height
+                };
+                
+                // Check if cards would overlap using actual dimensions
+                const overlapX = x < otherCard.x + otherDims.width && x + currentDims.width > otherCard.x;
+                const overlapY = y < otherCard.y + otherDims.height && y + currentDims.height > otherCard.y;
+                
+                if (overlapX && overlapY) {
+                    // Cards would overlap, find the nearest non-overlapping position
+                    const leftDistance = Math.abs(x - (otherCard.x - currentDims.width));
+                    const rightDistance = Math.abs(x - (otherCard.x + otherDims.width));
+                    
+                    if (leftDistance < rightDistance) {
+                        return Math.max(0, otherCard.x - currentDims.width);
+                    } else {
+                        return Math.min(a4Dimensions.width - currentDims.width, otherCard.x + otherDims.width);
+                    }
+                }
+            }
+            
+            return x;
+        }
+
+        // Stop dragging
+        function stopDrag() {
+            isDragging = false;
+            
+            // Remove visual feedback
+            if (currentImage) {
+                const element = document.querySelector(`[data-image-id="${currentImage.id}"]`);
+                if (element) {
+                    element.classList.remove('dragging');
+                }
+            }
+            
+            currentImage = null;
+            currentDragArea = null;
+            document.removeEventListener('mousemove', handleDrag);
+            document.removeEventListener('mouseup', stopDrag);
+        }
+
+        // Resize functionality removed per application.mdc - users cannot resize images
+
+        // Rotate image
+        function rotateImage(imageId) {
+            const image = images.find(img => img.id === imageId);
+            if (!image) return;
+            
+            console.log('Rotating image', { imageId, wasRotated: image.isRotated });
+            
+            // Toggle rotation state
+            image.isRotated = !image.isRotated;
+            
+            // Swap dimensions to reflect the new visual bounds
+            const oldWidth = image.width;
+            const oldHeight = image.height;
+            
+            if (image.isRotated) {
+                // Swap dimensions for rotated state
+                image.width = oldHeight;
+                image.height = oldWidth;
+                image.cardWidthMm = CARD_HEIGHT_MM;  // 88mm
+                image.cardHeightMm = CARD_WIDTH_MM;  // 63.5mm
+            } else {
+                // Restore original dimensions
+                image.width = oldHeight;
+                image.height = oldWidth;
+                image.cardWidthMm = CARD_WIDTH_MM;   // 63.5mm
+                image.cardHeightMm = CARD_HEIGHT_MM; // 88mm
+            }
+            
+            // Constrain to A4 bounds with new dimensions
+            image.x = Math.max(0, Math.min(image.x, a4Dimensions.width - image.width));
+            image.y = Math.max(0, Math.min(image.y, a4Dimensions.height - image.height));
+            
+            // Update DOM element
+            const element = document.querySelector(`[data-image-id="${imageId}"]`);
+            if (element) {
+                // Update container dimensions to reflect new visual bounds
+                element.style.width = image.width + 'px';
+                element.style.height = image.height + 'px';
+                element.style.left = image.x + 'px';
+                element.style.top = image.y + 'px';
+                
+                // Update image rotation and dimensions
+                const imgElement = element.querySelector('img');
+                if (imgElement) {
+                    if (image.isRotated) {
+                        imgElement.classList.add('image-rotated');
+                        imgElement.style.transform = 'rotate(90deg)';
+                    } else {
+                        imgElement.classList.remove('image-rotated');
+                        imgElement.style.transform = 'none';
+                    }
+                    
+                    // Update image dimensions to match container
+                    imgElement.style.width = '100%';
+                    imgElement.style.height = '100%';
+                    imgElement.style.objectFit = 'cover';
+                }
+                
+                // Recalculate control positions for the new rotation state
+                const getControlPositions = (isRotated, containerWidth, containerHeight) => {
+                    if (isRotated) {
+                        // When rotated 90°, the "top-most part" of the image is now the left side
+                        // Controls should be positioned at the left and right sides of the container
+                        return {
+                            topLeft: { top: '50%', left: '4px', transform: 'translateY(-50%)' },      // Left side of container (top of rotated image)
+                            topRight: { top: '50%', right: '4px', transform: 'translateY(-50%)' }     // Right side of container (top of rotated image)
+                        };
+                    } else {
+                        // Normal orientation - controls at top-left and top-right
+                        return {
+                            topLeft: { top: '4px', left: '4px' },
+                            topRight: { top: '4px', right: '4px' }
+                        };
+                    }
+                };
+                
+                const controlPositions = getControlPositions(image.isRotated, image.width, image.height);
+                
+                // Update control positions
+                const rotationIndicator = element.querySelector('.control-top-left');
+                if (rotationIndicator) {
+                    rotationIndicator.style.top = controlPositions.topLeft.top;
+                    rotationIndicator.style.left = controlPositions.topLeft.left;
+                    if (controlPositions.topLeft.transform) {
+                        rotationIndicator.style.transform = controlPositions.topLeft.transform;
+                    }
+                    rotationIndicator.textContent = image.isRotated ? '↻' : '↻';
+                    rotationIndicator.title = image.isRotated ? 'Click to rotate back (88×63.5mm)' : 'Click to rotate (63.5×88mm)';
+                }
+                
+                const removeBtn = element.querySelector('.control-top-right');
+                if (removeBtn) {
+                    removeBtn.style.top = controlPositions.topRight.top;
+                    removeBtn.style.right = controlPositions.topRight.right;
+                    if (controlPositions.topRight.transform) {
+                        removeBtn.style.transform = controlPositions.topRight.transform;
+                    }
+                }
+            }
+            
+            // Gallery functionality removed per application.mdc
+            
+            console.log('Image rotated', { imageId, isRotated: image.isRotated, dimensions: { width: image.width, height: image.height }, cardDimensions: { width: image.cardWidthMm, height: image.cardHeightMm } });
+        }
+
+        // Add image to A4 canvas
+        function addImageToCanvas(image) {
+            console.log('Adding image to A4 canvas', { imageId: image.id, imageName: image.name });
+            const element = createImageElement(image);
+            a4Canvas.appendChild(element);
+            a4EmptyState.style.display = 'none';
+            console.log('Image added to A4 canvas', { element, hasOnmousedown: !!element.onmousedown });
+        }
+
+        // Gallery functionality removed per application.mdc
+
+        // Remove image
+        function removeImage(id) {
+            images = images.filter(img => img.id !== id);
+            const element = document.querySelector(`[data-image-id="${id}"]`);
+            if (element) {
+                element.remove();
+            }
+            
+            // Show empty state if no images
+            if (images.length === 0) {
+                a4EmptyState.style.display = 'flex';
+            }
+            
+            updateUI();
+        }
+
+        // Clear all images
+        function clearAllImages() {
+            images = [];
+            a4Canvas.querySelectorAll('.image-container').forEach(el => el.remove());
+            a4EmptyState.style.display = 'flex';
+            updateUI();
+        }
+
+        // Update UI
+        function updateUI() {
+            imageCount.textContent = images.length;
+            generatePdfBtn.disabled = images.length === 0;
+            clearAllBtn.style.display = images.length > 0 ? 'block' : 'none';
+            pdfStatus.textContent = images.length === 0 ? 'Add cards first' : `${images.length} card${images.length !== 1 ? 's' : ''} ready`;
+            
+            if (images.length === 0) {
+                a4EmptyState.style.display = 'flex';
+            }
+        }
+
+        // Process dropped files
+        async function processFiles(files) {
+            for (const file of files) {
+                if (!file.type.startsWith('image/')) continue;
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        // Calculate proper card dimensions based on orientation detection
+                        const cardDims = calculateCardDimensions(img.width, img.height);
+                        
+                        // Scale card dimensions to fit A4 layout
+                        const cardWidthScaled = cardDims.width * a4Dimensions.scale;
+                        const cardHeightScaled = cardDims.height * a4Dimensions.scale;
+                        
+                        const image = {
+                            id: Math.random().toString(36).substr(2, 9),
+                            src: e.target.result,
+                            name: file.name,
+                            x: (a4Dimensions.width - cardWidthScaled) / 2,
+                            y: (a4Dimensions.height - cardHeightScaled) / 2,
+                            width: cardWidthScaled,
+                            height: cardHeightScaled,
+                            originalWidth: img.width,
+                            originalHeight: img.height,
+                            isRotated: cardDims.isRotated,
+                            cardWidthMm: cardDims.isRotated ? CARD_HEIGHT_MM : CARD_WIDTH_MM,
+                            cardHeightMm: cardDims.isRotated ? CARD_WIDTH_MM : CARD_HEIGHT_MM
+                        };
+                        
+                        // Constrain to A4 bounds
+                        image.x = Math.max(0, Math.min(image.x, a4Dimensions.width - image.width));
+                        image.y = Math.max(0, Math.min(image.y, a4Dimensions.height - image.height));
+                        
+                        images.push(image);
+                        addImageToCanvas(image);
+                        updateUI();
+                        
+                        console.log('Image processing complete', { 
+                            imageId: image.id, 
+                            totalImages: images.length,
+                            a4CanvasChildren: a4Canvas.children.length
+                        });
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // Generate PDF
+        async function generatePDF() {
+            if (images.length === 0) return;
+            
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF({
+                orientation: 'landscape',
+                unit: 'mm',
+                format: 'a4'
+            });
+            
+            for (const image of images) {
+                try {
+                    // Use the actual card dimensions in mm
+                    const xMm = pixelsToMm(image.x / a4Dimensions.scale);
+                    const yMm = pixelsToMm(image.y / a4Dimensions.scale);
+                    const widthMm = image.cardWidthMm;
+                    const heightMm = image.cardHeightMm;
+                    
+                    const constrainedX = Math.max(0, Math.min(xMm, A4_WIDTH_MM - widthMm));
+                    const constrainedY = Math.max(0, Math.min(yMm, A4_HEIGHT_MM - heightMm));
+                    const constrainedWidth = Math.min(widthMm, A4_WIDTH_MM - constrainedX);
+                    const constrainedHeight = Math.min(heightMm, A4_HEIGHT_MM - constrainedY);
+                    
+                    // Add image to PDF with correct dimensions
+                    // For rotated images, the dimensions are already swapped in cardWidthMm/cardHeightMm
+                    pdf.addImage(
+                        image.src,
+                        'JPEG',
+                        constrainedX,
+                        constrainedY,
+                        constrainedWidth,
+                        constrainedHeight
+                    );
+                } catch (error) {
+                    console.error(`Failed to add image ${image.name} to PDF:`, error);
+                }
+            }
+            
+            pdf.save('cardlayer-export.pdf');
+        }
+
+        // Event listeners
+        importBtn.onclick = () => fileInput.click();
+        fileInput.onchange = (e) => processFiles(e.target.files);
+        generatePdfBtn.onclick = generatePDF;
+        clearAllBtn.onclick = clearAllImages;
+
+        // Drag and drop for A4 canvas
+        a4Canvas.ondragover = (e) => {
+            e.preventDefault();
+            dropOverlay.style.display = 'flex';
+        };
+
+        a4Canvas.ondragleave = (e) => {
+            if (!a4Canvas.contains(e.relatedTarget)) {
+                dropOverlay.style.display = 'none';
+            }
+        };
+
+        a4Canvas.ondrop = (e) => {
+            e.preventDefault();
+            dropOverlay.style.display = 'none';
+            processFiles(e.dataTransfer.files);
+        };
+
+        // Gallery drag and drop removed per application.mdc - 2-section layout only
+
+        // Initialize
+        window.onload = () => {
+            initA4Dimensions();
+            updateUI();
+        };
+
+        window.onresize = () => {
+            initA4Dimensions();
+            // Reposition all images
+            images.forEach(image => {
+                const element = document.querySelector(`[data-image-id="${image.id}"]`);
+                if (element) {
+                    element.style.left = image.x + 'px';
+                    element.style.top = image.y + 'px';
+                }
+            });
+        };
+    </script>
+</body>
+</html>
+¢
