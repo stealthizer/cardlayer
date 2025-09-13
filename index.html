@@ -316,7 +316,7 @@
         function initA4Dimensions() {
             // Get available space for A4 layout (70% of screen width, full height minus padding)
             const containerWidth = window.innerWidth * 0.7 - 32; // 70% minus minimal padding
-            const containerHeight = window.innerHeight - 32; // Full height minus minimal padding
+            const containerHeight = window.innerHeight - 32 - 100; // Full height minus minimal padding and 20px bottom padding
             
             // A4 dimensions in pixels (horizontal: 297mm x 210mm)
             const baseWidth = mmToPixels(A4_WIDTH_MM);  // 297mm
@@ -389,17 +389,18 @@
             img.style.height = '100%';
             img.style.objectFit = 'cover';
             
-            // For rotated images, ensure the rotation is applied
+            // For rotated images, ensure the rotation is applied to the container
             if (image.isRotated) {
-                img.style.transform = 'rotate(90deg)';
+                container.style.transform = 'rotate(90deg)';
+                // Ensure image maintains proper aspect ratio when rotated
+                img.style.objectFit = 'contain';
             }
 
             // Calculate control positions based on rotation
             const getControlPositions = (isRotated, containerWidth, containerHeight) => {
                 if (isRotated) {
-                    // When rotated 90°, the "top-most part" of the image is now the left side
+                    // When container is rotated 90°, the "top" of the rotated image is at the left side
                     // Controls should be positioned at the left and right sides of the container
-                    // (which correspond to the top-left and top-right of the rotated image)
                     return {
                         topLeft: { top: '50%', left: '4px', transform: 'translateY(-50%)' },      // Left side of container (top of rotated image)
                         topRight: { top: '50%', right: '4px', transform: 'translateY(-50%)' }     // Right side of container (top of rotated image)
@@ -541,9 +542,24 @@
                 const relativeX = newX - a4Rect.left;
                 const relativeY = newY - a4Rect.top;
                 
-                // Use actual dimensions since we now properly swap them in rotateImage
-                const constrainedX = Math.max(0, Math.min(relativeX, a4Dimensions.width - currentImage.width));
-                const constrainedY = Math.max(0, Math.min(relativeY, a4Dimensions.height - currentImage.height));
+                // Get effective dimensions for boundary checking
+                const getEffectiveDimensions = (card) => {
+                    if (card.isRotated) {
+                        return {
+                            width: card.height,
+                            height: card.width
+                        };
+                    } else {
+                        return {
+                            width: card.width,
+                            height: card.height
+                        };
+                    }
+                };
+                
+                const effectiveDims = getEffectiveDimensions(currentImage);
+                const constrainedX = Math.max(0, Math.min(relativeX, a4Dimensions.width - effectiveDims.width));
+                const constrainedY = Math.max(0, Math.min(relativeY, a4Dimensions.height - effectiveDims.height));
             
             // Check for collisions with other cards (no stacking)
             const finalX = checkCollisions(constrainedX, constrainedY, currentImage.id);
@@ -564,7 +580,8 @@
             const currentCard = images.find(img => img.id === currentId);
             if (!currentCard) return x;
             
-            // Use actual dimensions since we now properly swap them in rotateImage
+            // For collision detection, use the actual container dimensions
+            // since the visual bounds are determined by the container size
             const currentDims = {
                 width: currentCard.width,
                 height: currentCard.height
@@ -578,7 +595,7 @@
                     height: otherCard.height
                 };
                 
-                // Check if cards would overlap using actual dimensions
+                // Check if cards would overlap using actual container dimensions
                 const overlapX = x < otherCard.x + otherDims.width && x + currentDims.width > otherCard.x;
                 const overlapY = y < otherCard.y + otherDims.height && y + currentDims.height > otherCard.y;
                 
@@ -628,58 +645,41 @@
             // Toggle rotation state
             image.isRotated = !image.isRotated;
             
-            // Swap dimensions to reflect the new visual bounds
-            const oldWidth = image.width;
-            const oldHeight = image.height;
-            
+            // Update card dimensions in mm (for PDF generation) but keep container dimensions the same
             if (image.isRotated) {
-                // Swap dimensions for rotated state
-                image.width = oldHeight;
-                image.height = oldWidth;
                 image.cardWidthMm = CARD_HEIGHT_MM;  // 88mm
                 image.cardHeightMm = CARD_WIDTH_MM;  // 63.5mm
             } else {
-                // Restore original dimensions
-                image.width = oldHeight;
-                image.height = oldWidth;
                 image.cardWidthMm = CARD_WIDTH_MM;   // 63.5mm
                 image.cardHeightMm = CARD_HEIGHT_MM; // 88mm
             }
             
-            // Constrain to A4 bounds with new dimensions
-            image.x = Math.max(0, Math.min(image.x, a4Dimensions.width - image.width));
-            image.y = Math.max(0, Math.min(image.y, a4Dimensions.height - image.height));
+            // No need to change container dimensions - just rotate the container
+            // The visual rotation will make it appear as if dimensions are swapped
             
             // Update DOM element
             const element = document.querySelector(`[data-image-id="${imageId}"]`);
             if (element) {
-                // Update container dimensions to reflect new visual bounds
-                element.style.width = image.width + 'px';
-                element.style.height = image.height + 'px';
-                element.style.left = image.x + 'px';
-                element.style.top = image.y + 'px';
+                // Update container rotation only - keep original dimensions
+                if (image.isRotated) {
+                    element.style.transform = 'rotate(90deg)';
+                } else {
+                    element.style.transform = 'none';
+                }
                 
-                // Update image rotation and dimensions
+                // Update image dimensions to match container
                 const imgElement = element.querySelector('img');
                 if (imgElement) {
-                    if (image.isRotated) {
-                        imgElement.classList.add('image-rotated');
-                        imgElement.style.transform = 'rotate(90deg)';
-                    } else {
-                        imgElement.classList.remove('image-rotated');
-                        imgElement.style.transform = 'none';
-                    }
-                    
-                    // Update image dimensions to match container
                     imgElement.style.width = '100%';
                     imgElement.style.height = '100%';
-                    imgElement.style.objectFit = 'cover';
+                    // Use contain for rotated images to maintain aspect ratio
+                    imgElement.style.objectFit = image.isRotated ? 'contain' : 'cover';
                 }
                 
                 // Recalculate control positions for the new rotation state
                 const getControlPositions = (isRotated, containerWidth, containerHeight) => {
                     if (isRotated) {
-                        // When rotated 90°, the "top-most part" of the image is now the left side
+                        // When container is rotated 90°, the "top" of the rotated image is at the left side
                         // Controls should be positioned at the left and right sides of the container
                         return {
                             topLeft: { top: '50%', left: '4px', transform: 'translateY(-50%)' },      // Left side of container (top of rotated image)
@@ -832,6 +832,7 @@
                 format: 'a4'
             });
             
+            // Process images sequentially to handle async operations
             for (const image of images) {
                 try {
                     // Use the actual card dimensions in mm
@@ -845,16 +846,57 @@
                     const constrainedWidth = Math.min(widthMm, A4_WIDTH_MM - constrainedX);
                     const constrainedHeight = Math.min(heightMm, A4_HEIGHT_MM - constrainedY);
                     
-                    // Add image to PDF with correct dimensions
-                    // For rotated images, the dimensions are already swapped in cardWidthMm/cardHeightMm
-                    pdf.addImage(
-                        image.src,
-                        'JPEG',
-                        constrainedX,
-                        constrainedY,
-                        constrainedWidth,
-                        constrainedHeight
-                    );
+                    if (image.isRotated) {
+                        // For rotated images, we need to rotate the image content
+                        await new Promise((resolve, reject) => {
+                            // Create a canvas to rotate the image
+                            const canvas = document.createElement('canvas');
+                            const ctx = canvas.getContext('2d');
+                            
+                            // Set canvas size to the rotated dimensions
+                            canvas.width = image.originalHeight;
+                            canvas.height = image.originalWidth;
+                            
+                            // Create image element to load the source
+                            const img = new Image();
+                            img.onload = () => {
+                                try {
+                                    // Rotate the canvas 90 degrees
+                                    ctx.translate(canvas.width / 2, canvas.height / 2);
+                                    ctx.rotate(Math.PI / 2);
+                                    ctx.drawImage(img, -img.width / 2, -img.height / 2);
+                                    
+                                    // Convert canvas to data URL
+                                    const rotatedDataUrl = canvas.toDataURL('image/jpeg');
+                                    
+                                    // Add rotated image to PDF
+                                    pdf.addImage(
+                                        rotatedDataUrl,
+                                        'JPEG',
+                                        constrainedX,
+                                        constrainedY,
+                                        constrainedWidth,
+                                        constrainedHeight
+                                    );
+                                    resolve();
+                                } catch (error) {
+                                    reject(error);
+                                }
+                            };
+                            img.onerror = reject;
+                            img.src = image.src;
+                        });
+                    } else {
+                        // For normal images, add directly
+                        pdf.addImage(
+                            image.src,
+                            'JPEG',
+                            constrainedX,
+                            constrainedY,
+                            constrainedWidth,
+                            constrainedHeight
+                        );
+                    }
                 } catch (error) {
                     console.error(`Failed to add image ${image.name} to PDF:`, error);
                 }
