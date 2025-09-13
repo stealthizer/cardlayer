@@ -193,6 +193,9 @@
         // Card dimensions in mm
         const CARD_WIDTH_MM = 63.5;
         const CARD_HEIGHT_MM = 88;
+        
+        // Grid snapping settings
+        const GRID_SIZE = 10; // Grid size in pixels for snapping
 
         // Convert mm to pixels
         function mmToPixels(mm) {
@@ -202,6 +205,109 @@
         // Convert pixels to mm
         function pixelsToMm(pixels) {
             return (pixels * 25.4) / DPI;
+        }
+        
+        // Snap position to grid
+        function snapToGrid(x, y) {
+            return {
+                x: Math.round(x / GRID_SIZE) * GRID_SIZE,
+                y: Math.round(y / GRID_SIZE) * GRID_SIZE
+            };
+        }
+        
+        // Detect if image has alpha channel
+        function hasAlphaChannel(imageData) {
+            for (let i = 3; i < imageData.data.length; i += 4) {
+                if (imageData.data[i] < 255) {
+                    return true; // Found non-opaque pixel
+                }
+            }
+            return false;
+        }
+        
+        // Find the bounding box of non-transparent pixels
+        function findBoundingBox(imageData) {
+            const width = imageData.width;
+            const height = imageData.height;
+            const data = imageData.data;
+            
+            let minX = width, minY = height, maxX = -1, maxY = -1;
+            
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const alphaIndex = (y * width + x) * 4 + 3;
+                    if (data[alphaIndex] > 0) { // Non-transparent pixel
+                        minX = Math.min(minX, x);
+                        minY = Math.min(minY, y);
+                        maxX = Math.max(maxX, x);
+                        maxY = Math.max(maxY, y);
+                    }
+                }
+            }
+            
+            return {
+                x: minX,
+                y: minY,
+                width: maxX - minX + 1,
+                height: maxY - minY + 1
+            };
+        }
+        
+        // Trim borders from image with alpha channel
+        function trimImageBorders(image) {
+            return new Promise((resolve) => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Set canvas size to image size
+                canvas.width = image.width;
+                canvas.height = image.height;
+                
+                // Draw image to canvas
+                ctx.drawImage(image, 0, 0);
+                
+                // Get image data
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                
+                // Check if image has alpha channel
+                if (!hasAlphaChannel(imageData)) {
+                    // No alpha channel, return original image
+                    resolve(image);
+                    return;
+                }
+                
+                // Find bounding box of non-transparent pixels
+                const boundingBox = findBoundingBox(imageData);
+                
+                // If bounding box is the same as original image, no trimming needed
+                if (boundingBox.x === 0 && boundingBox.y === 0 && 
+                    boundingBox.width === image.width && boundingBox.height === image.height) {
+                    resolve(image);
+                    return;
+                }
+                
+                // Create new canvas with trimmed dimensions
+                const trimmedCanvas = document.createElement('canvas');
+                const trimmedCtx = trimmedCanvas.getContext('2d');
+                
+                trimmedCanvas.width = boundingBox.width;
+                trimmedCanvas.height = boundingBox.height;
+                
+                // Clear the canvas to ensure transparency
+                trimmedCtx.clearRect(0, 0, boundingBox.width, boundingBox.height);
+                
+                // Draw trimmed portion with alpha channel preserved
+                trimmedCtx.drawImage(
+                    image,
+                    boundingBox.x, boundingBox.y, boundingBox.width, boundingBox.height,
+                    0, 0, boundingBox.width, boundingBox.height
+                );
+                
+                // Convert back to image with PNG format to preserve alpha
+                const trimmedImage = new Image();
+                trimmedImage.onload = () => resolve(trimmedImage);
+                trimmedImage.src = trimmedCanvas.toDataURL('image/png');
+            });
         }
 
         // Detect card orientation and calculate proper dimensions
@@ -260,21 +366,24 @@
 
         // Find nearest valid position
         function findNearestValidPosition(image, targetX, targetY) {
-            const step = 10; // Search step size
+            const step = GRID_SIZE; // Use grid size as step size
             const maxAttempts = 50;
             
-            // Try exact position first
-            if (isValidPosition(image, targetX, targetY)) {
-                return { x: targetX, y: targetY };
+            // Snap target position to grid
+            const snappedTarget = snapToGrid(targetX, targetY);
+            
+            // Try snapped position first
+            if (isValidPosition(image, snappedTarget.x, snappedTarget.y)) {
+                return { x: snappedTarget.x, y: snappedTarget.y };
             }
             
-            // Search in expanding spiral
+            // Search in expanding spiral using grid steps
             for (let radius = step; radius <= step * maxAttempts; radius += step) {
                 const positions = [
-                    { x: targetX, y: targetY - radius }, // up
-                    { x: targetX + radius, y: targetY }, // right
-                    { x: targetX, y: targetY + radius }, // down
-                    { x: targetX - radius, y: targetY }, // left
+                    { x: snappedTarget.x, y: snappedTarget.y - radius }, // up
+                    { x: snappedTarget.x + radius, y: snappedTarget.y }, // right
+                    { x: snappedTarget.x, y: snappedTarget.y + radius }, // down
+                    { x: snappedTarget.x - radius, y: snappedTarget.y }, // left
                 ];
                 
                 for (const pos of positions) {
@@ -561,16 +670,19 @@
                 const constrainedX = Math.max(0, Math.min(relativeX, a4Dimensions.width - effectiveDims.width));
                 const constrainedY = Math.max(0, Math.min(relativeY, a4Dimensions.height - effectiveDims.height));
             
+            // Snap to grid for easier alignment
+            const snappedPosition = snapToGrid(constrainedX, constrainedY);
+            
             // Check for collisions with other cards (no stacking)
-            const finalX = checkCollisions(constrainedX, constrainedY, currentImage.id);
+            const finalX = checkCollisions(snappedPosition.x, snappedPosition.y, currentImage.id);
             
             currentImage.x = finalX;
-            currentImage.y = constrainedY;
+            currentImage.y = snappedPosition.y;
             
             const element = document.querySelector(`[data-image-id="${currentImage.id}"]`);
             if (element) {
                 element.style.left = finalX + 'px';
-                element.style.top = constrainedY + 'px';
+                element.style.top = snappedPosition.y + 'px';
                 }
             }
         }
@@ -776,44 +888,63 @@
                 if (!file.type.startsWith('image/')) continue;
                 
                 const reader = new FileReader();
-                reader.onload = (e) => {
+                reader.onload = async (e) => {
                     const img = new Image();
-                    img.onload = () => {
-                        // Calculate proper card dimensions based on orientation detection
-                        const cardDims = calculateCardDimensions(img.width, img.height);
-                        
-                        // Scale card dimensions to fit A4 layout
-                        const cardWidthScaled = cardDims.width * a4Dimensions.scale;
-                        const cardHeightScaled = cardDims.height * a4Dimensions.scale;
-                        
-                        const image = {
-                            id: Math.random().toString(36).substr(2, 9),
-                            src: e.target.result,
-                            name: file.name,
-                            x: (a4Dimensions.width - cardWidthScaled) / 2,
-                            y: (a4Dimensions.height - cardHeightScaled) / 2,
-                            width: cardWidthScaled,
-                            height: cardHeightScaled,
-                            originalWidth: img.width,
-                            originalHeight: img.height,
-                            isRotated: cardDims.isRotated,
-                            cardWidthMm: cardDims.isRotated ? CARD_HEIGHT_MM : CARD_WIDTH_MM,
-                            cardHeightMm: cardDims.isRotated ? CARD_WIDTH_MM : CARD_HEIGHT_MM
-                        };
-                        
-                        // Constrain to A4 bounds
-                        image.x = Math.max(0, Math.min(image.x, a4Dimensions.width - image.width));
-                        image.y = Math.max(0, Math.min(image.y, a4Dimensions.height - image.height));
-                        
-                        images.push(image);
-                        addImageToCanvas(image);
-                        updateUI();
-                        
-                        console.log('Image processing complete', { 
-                            imageId: image.id, 
-                            totalImages: images.length,
-                            a4CanvasChildren: a4Canvas.children.length
-                        });
+                    img.onload = async () => {
+                        try {
+                            // Pre-process image: trim borders if PNG with alpha channel
+                            let processedImg = img;
+                            if (file.type === 'image/png') {
+                                console.log('Processing PNG image for border trimming...');
+                                processedImg = await trimImageBorders(img);
+                                console.log('Border trimming complete', {
+                                    original: { width: img.width, height: img.height },
+                                    trimmed: { width: processedImg.width, height: processedImg.height }
+                                });
+                            }
+                            
+                            // Calculate proper card dimensions based on orientation detection
+                            const cardDims = calculateCardDimensions(processedImg.width, processedImg.height);
+                            
+                            // Scale card dimensions to fit A4 layout
+                            const cardWidthScaled = cardDims.width * a4Dimensions.scale;
+                            const cardHeightScaled = cardDims.height * a4Dimensions.scale;
+                            
+                            // Use processed image data URL
+                            const processedDataUrl = processedImg.src || e.target.result;
+                            
+                            const image = {
+                                id: Math.random().toString(36).substr(2, 9),
+                                src: processedDataUrl,
+                                name: file.name,
+                                x: (a4Dimensions.width - cardWidthScaled) / 2,
+                                y: (a4Dimensions.height - cardHeightScaled) / 2,
+                                width: cardWidthScaled,
+                                height: cardHeightScaled,
+                                originalWidth: processedImg.width,
+                                originalHeight: processedImg.height,
+                                isRotated: cardDims.isRotated,
+                                cardWidthMm: cardDims.isRotated ? CARD_HEIGHT_MM : CARD_WIDTH_MM,
+                                cardHeightMm: cardDims.isRotated ? CARD_WIDTH_MM : CARD_HEIGHT_MM
+                            };
+                            
+                            // Constrain to A4 bounds
+                            image.x = Math.max(0, Math.min(image.x, a4Dimensions.width - image.width));
+                            image.y = Math.max(0, Math.min(image.y, a4Dimensions.height - image.height));
+                            
+                            images.push(image);
+                            addImageToCanvas(image);
+                            updateUI();
+                            
+                            console.log('Image processing complete', { 
+                                imageId: image.id, 
+                                totalImages: images.length,
+                                a4CanvasChildren: a4Canvas.children.length,
+                                preprocessed: file.type === 'image/png'
+                            });
+                        } catch (error) {
+                            console.error('Error processing image:', error);
+                        }
                     };
                     img.src = e.target.result;
                 };
@@ -835,11 +966,25 @@
             // Process images sequentially to handle async operations
             for (const image of images) {
                 try {
-                    // Use the actual card dimensions in mm
-                    const xMm = pixelsToMm(image.x / a4Dimensions.scale);
-                    const yMm = pixelsToMm(image.y / a4Dimensions.scale);
+                    // Calculate position in mm
+                    let xMm = pixelsToMm(image.x / a4Dimensions.scale);
+                    let yMm = pixelsToMm(image.y / a4Dimensions.scale);
                     const widthMm = image.cardWidthMm;
                     const heightMm = image.cardHeightMm;
+                    
+                    // For rotated images, adjust the position to match visual bounds
+                    if (image.isRotated) {
+                        // When rotated, the visual position is offset by the difference in dimensions
+                        // The image appears to be positioned at (x, y) but its visual center is different
+                        const originalWidthMm = CARD_WIDTH_MM;
+                        const originalHeightMm = CARD_HEIGHT_MM;
+                        const rotatedWidthMm = CARD_HEIGHT_MM;
+                        const rotatedHeightMm = CARD_WIDTH_MM;
+                        
+                        // Adjust position to account for the visual offset of rotation
+                        xMm = xMm + (originalWidthMm - rotatedWidthMm) / 2;
+                        yMm = yMm + (originalHeightMm - rotatedHeightMm) / 2;
+                    }
                     
                     const constrainedX = Math.max(0, Math.min(xMm, A4_WIDTH_MM - widthMm));
                     const constrainedY = Math.max(0, Math.min(yMm, A4_HEIGHT_MM - heightMm));
@@ -866,13 +1011,13 @@
                                     ctx.rotate(Math.PI / 2);
                                     ctx.drawImage(img, -img.width / 2, -img.height / 2);
                                     
-                                    // Convert canvas to data URL
-                                    const rotatedDataUrl = canvas.toDataURL('image/jpeg');
+                                    // Convert canvas to data URL with PNG format to preserve alpha
+                                    const rotatedDataUrl = canvas.toDataURL('image/png');
                                     
                                     // Add rotated image to PDF
                                     pdf.addImage(
                                         rotatedDataUrl,
-                                        'JPEG',
+                                        'PNG',
                                         constrainedX,
                                         constrainedY,
                                         constrainedWidth,
@@ -887,10 +1032,10 @@
                             img.src = image.src;
                         });
                     } else {
-                        // For normal images, add directly
+                        // For normal images, add directly with PNG format to preserve alpha
                         pdf.addImage(
                             image.src,
-                            'JPEG',
+                            'PNG',
                             constrainedX,
                             constrainedY,
                             constrainedWidth,
