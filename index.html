@@ -402,8 +402,6 @@
             if (cardTypeData.width === cardTypeData.height || 
                 cardType === 'inner-dial' || 
                 cardType === 'front-dial') {
-            // For square cards (medium and large ships), no rotation detection needed
-            if (cardTypeData.width === cardTypeData.height) {
                 isRotated = false;
                 cardWidth = cardTypeData.width;
                 cardHeight = cardTypeData.height;
@@ -646,38 +644,6 @@
                     e.stopPropagation();
                 };
             }
-
-            // Add card type selector
-            const cardTypeSelect = document.createElement('select');
-            cardTypeSelect.className = 'control-bottom-left card-type-select bg-white text-gray-700 text-xs px-1 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:bg-gray-100 select-none border';
-            cardTypeSelect.style.bottom = controlPositions.cardType.bottom;
-            cardTypeSelect.style.left = controlPositions.cardType.left;
-            cardTypeSelect.style.fontSize = '10px';
-            cardTypeSelect.style.padding = '2px';
-            cardTypeSelect.title = 'Change card type';
-            
-            // Add options
-            Object.keys(CARD_TYPES).forEach(type => {
-                const option = document.createElement('option');
-                option.value = type;
-                option.textContent = CARD_TYPES[type].name;
-                if (type === image.cardType) {
-                    option.selected = true;
-                }
-                cardTypeSelect.appendChild(option);
-            });
-            
-            cardTypeSelect.onchange = (e) => {
-                e.stopPropagation();
-                console.log('Card type selector changed for image', image.id, 'to', e.target.value);
-                changeCardType(image.id, e.target.value);
-            };
-            cardTypeSelect.onmousedown = (e) => {
-                e.stopPropagation();
-            };
-            cardTypeSelect.onclick = (e) => {
-                e.stopPropagation();
-            };
 
             // Add card type selector
             const cardTypeSelect = document.createElement('select');
