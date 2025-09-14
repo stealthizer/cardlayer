@@ -29,6 +29,26 @@
         
         /* Resize functionality removed per application.mdc - users cannot resize images */
         
+        .clone-btn {
+            position: absolute;
+            top: -8px;
+            right: 28px; /* Positioned to the left of remove button */
+            width: 24px;
+            height: 24px;
+            background: #3b82f6;
+            color: white;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
         .remove-btn {
             position: absolute;
             top: -8px;
@@ -49,6 +69,7 @@
             font-weight: bold;
         }
         
+        .image-container:hover .clone-btn,
         .image-container:hover .remove-btn {
             opacity: 1;
         }
@@ -653,6 +674,23 @@
 
             const controlPositions = getControlPositions(image.isRotated);
 
+            // Clone button
+            const cloneBtn = document.createElement('button');
+            cloneBtn.className = 'clone-btn control-bottom-right';
+            cloneBtn.style.bottom = controlPositions.remove.bottom;
+            cloneBtn.style.right = (parseInt(controlPositions.remove.right) + 32) + 'px'; // Position to the left of remove button
+            cloneBtn.innerHTML = '⧉'; // Clone symbol
+            cloneBtn.title = 'Clone image';
+            cloneBtn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                cloneImage(image.id);
+            };
+            cloneBtn.onmousedown = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            };
+
             const removeBtn = document.createElement('button');
             removeBtn.className = 'remove-btn control-bottom-right';
             removeBtn.style.bottom = controlPositions.remove.bottom;
@@ -778,6 +816,7 @@
             }
 
             container.appendChild(img);
+            container.appendChild(cloneBtn);
             container.appendChild(removeBtn);
             if (rotationIndicator) {
             container.appendChild(rotationIndicator);
@@ -790,7 +829,8 @@
             // Add drag functionality for A4 layout
             container.onmousedown = (e) => {
                 // Don't start drag if clicking on controls
-                if (e.target.classList.contains('remove-btn') || 
+                if (e.target.classList.contains('clone-btn') ||
+                    e.target.classList.contains('remove-btn') || 
                     e.target.classList.contains('card-type-select') ||
                     e.target.classList.contains('ship-name-input') ||
                     e.target.tagName === 'SELECT' ||
@@ -1085,6 +1125,44 @@
             }
             
             updateUI();
+        }
+
+        function cloneImage(id) {
+            const originalImage = images.find(img => img.id === id);
+            if (!originalImage) {
+                console.log('Original image not found for cloning');
+                return;
+            }
+
+            console.log('Cloning image:', originalImage);
+
+            // Create a clone with a new ID and slightly offset position
+            const clonedImage = {
+                ...originalImage,
+                id: Math.random().toString(36).substr(2, 9),
+                x: originalImage.x + 20, // Offset by 20px to the right
+                y: originalImage.y + 20  // Offset by 20px down
+            };
+
+            // Ensure the clone stays within A4 bounds
+            clonedImage.x = Math.max(0, Math.min(clonedImage.x, a4Dimensions.width - clonedImage.width));
+            clonedImage.y = Math.max(0, Math.min(clonedImage.y, a4Dimensions.height - clonedImage.height));
+
+            console.log('Cloned image data:', clonedImage);
+
+            // Add to images array
+            images.push(clonedImage);
+
+            // Create and add the visual element to canvas
+            const element = createImageElement(clonedImage);
+            a4Canvas.appendChild(element);
+
+            // Hide empty state
+            a4EmptyState.style.display = 'none';
+
+            updateUI();
+            
+            console.log('Clone created, total images:', images.length);
         }
 
         // Get control positions - absolute positioning regardless of rotation
