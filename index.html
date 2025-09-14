@@ -1523,8 +1523,9 @@
                             // Scale the context for crisp rendering
                             ctx.scale(scale, scale);
                             
-                            // Set font properties to match exactly
-                            ctx.font = 'bold 12px Verdana, sans-serif';
+                            // Set font properties to match exactly (35% smaller for PDF)
+                            const pdfFontSize = 7.8; // 12px * 0.65 = 7.8px (35% smaller)
+                            ctx.font = `bold ${pdfFontSize}px Verdana, sans-serif`;
                             ctx.fillStyle = '#000000'; // Pure black instead of #333
                             ctx.textAlign = 'center';
                             ctx.textBaseline = 'alphabetic'; // Use alphabetic baseline for better positioning
@@ -1536,10 +1537,10 @@
                             // Clear canvas with transparent background
                             ctx.clearRect(0, 0, canvas.width / scale, canvas.height / scale);
                             
-                            // Draw the text with exact same spacing as screen
+                            // Draw the text with exact same spacing as screen (35% smaller)
                             const lines = image.shipName.trim().split('\n');
-                            const lineHeight = 14.4; // 12px * 1.2 line-height
-                            const fontSize = 12;
+                            const lineHeight = 9.36; // 7.8px * 1.2 line-height (35% smaller)
+                            const fontSize = pdfFontSize;
                             
                             lines.forEach((line, index) => {
                                 if (line.trim()) {
