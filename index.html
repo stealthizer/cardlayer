@@ -1340,8 +1340,15 @@
                                 });
                             }
                             
-                            // Calculate proper card dimensions based on orientation detection and selected card type
-                            const cardDims = calculateCardDimensions(processedImg.width, processedImg.height, selectedCardType);
+                            // Auto-detect dial-front from filename
+                            let detectedCardType = selectedCardType;
+                            if (file.name.toLowerCase().includes('dial-front')) {
+                                detectedCardType = 'front-dial';
+                                console.log('Auto-detected front-dial from filename:', file.name);
+                            }
+                            
+                            // Calculate proper card dimensions based on orientation detection and detected card type
+                            const cardDims = calculateCardDimensions(processedImg.width, processedImg.height, detectedCardType);
                         
                         // Scale card dimensions to fit A4 layout
                         const cardWidthScaled = cardDims.width * a4Dimensions.scale;
