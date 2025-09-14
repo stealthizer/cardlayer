@@ -1,24 +1,42 @@
-# Cardlayer - A4 Image Positioning Tool
+# Cardlayer - A4 Trading Card Layout Tool
 
-A **pure client-side** web application for positioning images on A4 paper and generating PDF files for printing. **No server required** - everything runs in the browser!
+A **pure client-side** web application for positioning trading card images on A4 paper and generating PDF files for printing. **No server required** - everything runs in the browser!
 
 ## Features
 
-- **Drag & Drop Interface**: Import images by dragging and dropping them into the application
-- **A4 Layout Preview**: See exactly how your images will appear on A4 paper
-- **Image Positioning**: Click and drag to reposition images on the A4 layout
-- **Image Resizing**: Resize images using the resize handle
-- **PDF Generation**: Export your layout as a PDF file for printing
+- **Multi-Size Card Support**: Support for different card types including Standard Cards and X-Wing ships
+- **Drag & Drop Interface**: Import images by dragging and dropping them directly onto the A4 layout
+- **A4 Layout Preview**: See exactly how your cards will appear on A4 paper (horizontal/landscape mode)
+- **Smart Image Positioning**: Click and drag to reposition images with grid snapping
+- **Image Rotation**: Rotate images 90° to change from vertical to horizontal orientation
+- **Card Type Selection**: Change card type of individual images after import
+- **Alpha Channel Processing**: Automatic border trimming for PNG images with transparency
+- **Grid Snapping System**: Invisible 10px grid for perfect card alignment
+- **Smart Collision Detection**: Prevents images from overlapping when positioning
+- **PDF Generation**: Export your layout as a PDF file with proper image rotation
 - **Responsive Design**: Works on different screen sizes with proportional scaling
 - **No Build Process**: Just open the HTML file in any modern browser
 
 ## Interface Layout
 
-The application consists of three main sections:
+The application consists of two main sections (simplified design):
 
-1. **Tool Layout (20% left)**: Contains controls, image count, file importer, and PDF generation button
-2. **Import Layout (30% center)**: Shows imported images in a gallery format
-3. **A4 View Layout (50% right)**: Interactive A4 paper preview where you position images
+1. **Tool Layout (30% left)**: Contains controls, image count, file importer, card type selector, and PDF generation button
+2. **A4 Layout (70% right)**: Interactive A4 paper preview where you position and rotate images
+
+## Card Specifications
+
+### Standard Cards
+- **Standard Card Size**: 63.5mm × 88mm (vertical orientation)
+- **Rotated Card Size**: 88mm × 63.5mm (horizontal orientation)
+- **Auto-Detection**: Automatically detects card orientation based on image aspect ratio
+- **Proportional Scaling**: Cards are scaled to fit the A4 layout while maintaining proper proportions
+
+### X-Wing Ships
+- **Small Ship (X-Wing)**: 32mm × 38mm
+- **Medium Ship (X-Wing)**: 54mm × 61mm
+- **Large Ship (X-Wing)**: 73mm × 80mm
+- **Rectangular Format**: Ships maintain their rectangular proportions
 
 ## How to Run
 
@@ -47,19 +65,71 @@ Then open `http://localhost:8000` in your browser.
 
 ## Usage
 
-1. **Import Images**: Click "📁 Import Images" or drag & drop image files
-2. **Position Images**: Drag images from the center panel to the A4 layout
-3. **Adjust Images**: Click and drag to reposition, use resize handles to adjust size
-4. **Remove Images**: Click the × button on any image to remove it
-5. **Generate PDF**: Click "📄 Generate PDF" when you're ready to export
+1. **Select Card Type**: Choose the card type from the dropdown in the tool layout
+2. **Import Images**: Click "🃏 Import Cards" or drag & drop image files directly onto the A4 layout
+3. **Position Images**: Click and drag to reposition images on the A4 layout
+4. **Rotate Images**: Click the rotation indicator (↻) or double-click an image to rotate 90°
+5. **Change Card Type**: Hover over any image and use the dropdown to change its card type
+6. **Remove Images**: Click the × button on any image to remove it
+7. **Generate PDF**: Click "📄 Generate PDF" when you're ready to export
+
+## Advanced Features
+
+### Image Rotation
+- **Visual Rotation**: Images rotate 90° with proper visual feedback
+- **Dimension Handling**: Container dimensions adapt to rotated orientation
+- **Control Positioning**: Rotation, card type, and remove controls stay in fixed positions
+- **Collision Detection**: Uses correct dimensions for rotated images to prevent overlapping
+- **PDF Generation**: Exports rotated images with correct dimensions and proper rotation
+
+### Grid Snapping System
+- **Invisible Grid**: 10px grid system for perfect alignment
+- **Automatic Snapping**: Images automatically snap to grid positions
+- **Easy Alignment**: Cards align at the same level automatically
+- **Consistent Positioning**: All cards follow the same grid system
+
+### Smart Collision Detection
+- **No Overlapping**: Prevents images from finishing movement on top of each other
+- **Rotated Support**: Collision boundaries match rotated image orientation
+- **Visual Accuracy**: Collision box matches the visible image area exactly
+- **Boundary Checking**: Prevents images from going outside A4 bounds
+
+### Alpha Channel Processing
+- **PNG Support**: Automatically processes PNG images with alpha channels
+- **Border Trimming**: Removes transparent borders around card images
+- **Transparency Preservation**: Maintains transparency in rotated images
+- **Pre-processing**: Trims borders before resizing to standard card dimensions
+
+### Card Type Management
+- **Multiple Types**: Support for Standard Cards and X-Wing ships
+- **Individual Control**: Change card type of any image after import
+- **Visual Feedback**: Controls appear on hover for clean interface
+- **Real-time Updates**: Images resize and reposition automatically when type changes
 
 ## Technical Details
 
 - **Pure HTML/CSS/JavaScript** - no frameworks or build tools
 - **CDN Dependencies**: Tailwind CSS and jsPDF loaded from CDN
 - **Client-side only** - no server backend required
-- **A4 Dimensions**: 210mm × 297mm (standard A4 size)
-- **PDF Generation**: Uses jsPDF library for client-side PDF creation
+- **A4 Dimensions**: 297mm × 210mm (horizontal/landscape mode)
+- **PDF Generation**: Uses jsPDF library with canvas-based image rotation
+- **Grid System**: 10px invisible grid for precise positioning
+- **Collision Detection**: Real-time collision prevention with effective dimensions
+- **Responsive Scaling**: A4 layout scales to fit screen with 100px bottom padding
+
+## Recent Updates
+
+- **Multi-Size Card Support**: Added support for different card types including X-Wing ships
+- **Card Type Selection**: Individual card type dropdowns for each imported image
+- **Alpha Channel Processing**: Automatic PNG border trimming and transparency preservation
+- **Enhanced Rotation**: Complete image rotation system with proper visual feedback
+- **Grid Snapping**: Invisible 10px grid system for perfect card alignment
+- **Smart Collision**: Advanced collision detection for both normal and rotated images
+- **PDF Rotation**: Proper image content rotation in PDF generation
+- **Position Mapping**: Accurate position mapping between A4 layout and PDF
+- **Control Positioning**: Fixed control positions regardless of image rotation
+- **Bottom Padding**: Added 100px bottom padding for better screen utilization
+- **Aspect Ratio Preservation**: Images maintain proper proportions when rotated
 
 ## Browser Support
 
@@ -72,9 +142,14 @@ Then open `http://localhost:8000` in your browser.
 
 ```
 Cardlayer/
-├── index.html          # Single HTML file containing everything
-├── README.md          # This file
-└── .gitignore         # Git ignore file
+├── index.html                    # Single HTML file containing everything
+├── README.md                    # This file
+├── .cursor/
+│   └── rules/
+│       └── project/
+│           ├── application.mdc  # Application requirements and rules
+│           └── rules.mdc        # Development rules
+└── .gitignore                   # Git ignore file
 ```
 
 ## No Installation Required!
