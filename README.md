@@ -20,6 +20,11 @@ The application consists of three main sections:
 2. **Import Layout (30% center)**: Shows imported images in a gallery format
 3. **A4 View Layout (50% right)**: Interactive A4 paper preview where you position images
 
+### X-Wing Dials
+- **Inner Dial (X-Wing)**: 43mm diameter (round)
+- **Front Dial (X-Wing)**: 50mm diameter (round)
+- **Circular Format**: Dials maintain their round proportions
+
 ## How to Run
 
 ### Option 1: Direct File Opening
