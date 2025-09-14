@@ -456,6 +456,50 @@
             });
         }
 
+        // Crop image to perfect circle for inner dials
+        function cropImageToCircle(image, diameterMm) {
+            return new Promise((resolve) => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Calculate diameter in pixels based on the image's current scale
+                const diameterPx = (diameterMm / 25.4) * 96; // Convert mm to pixels at 96 DPI
+                
+                // Set canvas size to the diameter (square canvas for circle)
+                canvas.width = diameterPx;
+                canvas.height = diameterPx;
+                
+                // Clear canvas with transparent background
+                ctx.clearRect(0, 0, diameterPx, diameterPx);
+                
+                // Create circular clipping path
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(diameterPx / 2, diameterPx / 2, diameterPx / 2, 0, 2 * Math.PI);
+                ctx.clip();
+                
+                // Calculate scaling to fit image within circle
+                const scale = Math.min(diameterPx / image.width, diameterPx / image.height);
+                const scaledWidth = image.width * scale;
+                const scaledHeight = image.height * scale;
+                
+                // Center the image within the circle
+                const x = (diameterPx - scaledWidth) / 2;
+                const y = (diameterPx - scaledHeight) / 2;
+                
+                // Draw the image scaled and centered
+                ctx.drawImage(image, x, y, scaledWidth, scaledHeight);
+                
+                // Restore context to remove clipping path
+                ctx.restore();
+                
+                // Convert to image with PNG format to preserve transparency
+                const circularImage = new Image();
+                circularImage.onload = () => resolve(circularImage);
+                circularImage.src = canvas.toDataURL('image/png');
+            });
+        }
+
         // Detect card orientation and calculate proper dimensions
         function calculateCardDimensions(originalWidth, originalHeight, cardType = 'standard') {
             const cardTypeData = CARD_TYPES[cardType];
@@ -1425,6 +1469,16 @@
                                 console.log('Auto-detected front-dial from filename:', file.name);
                             }
                             
+                            // Apply circular cropping for inner dials
+                            if (detectedCardType === 'inner-dial') {
+                                console.log('Applying circular cropping for inner dial...');
+                                processedImg = await cropImageToCircle(processedImg, 43); // 43mm diameter
+                                console.log('Circular cropping complete', {
+                                    original: { width: img.width, height: img.height },
+                                    cropped: { width: processedImg.width, height: processedImg.height }
+                                });
+                            }
+                            
                             // Calculate proper card dimensions based on orientation detection and detected card type
                             const cardDims = calculateCardDimensions(processedImg.width, processedImg.height, detectedCardType);
                         
@@ -1738,7 +1792,7 @@
             const lastUpdatedElement = document.getElementById('lastUpdated');
             if (lastUpdatedElement) {
                 // Fixed date when the application was last updated
-                const lastUpdatedDate = '2025-09-14 19:15';
+                const lastUpdatedDate = '2025-09-14 20:30';
                 lastUpdatedElement.textContent = lastUpdatedDate;
             }
         }
