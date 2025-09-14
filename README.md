@@ -38,6 +38,11 @@ The application consists of two main sections (simplified design):
 - **Large Ship (X-Wing)**: 73mm × 80mm
 - **Rectangular Format**: Ships maintain their rectangular proportions
 
+### X-Wing Dials
+- **Inner Dial (X-Wing)**: 43mm diameter (round)
+- **Front Dial (X-Wing)**: 50mm diameter (round)
+- **Circular Format**: Dials maintain their round proportions
+
 ## How to Run
 
 ### Option 1: Direct File Opening

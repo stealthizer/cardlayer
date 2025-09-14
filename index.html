@@ -133,6 +133,8 @@
                         <option value="small-ship">Small Ship (X-Wing) (32×38mm)</option>
                         <option value="medium-ship">Medium Ship (X-Wing) (54×61mm)</option>
                         <option value="large-ship">Large Ship (X-Wing) (73×80mm)</option>
+                        <option value="inner-dial">Inner Dial (X-Wing) (43mm)</option>
+                        <option value="front-dial">Front Dial (X-Wing) (50mm)</option>
                     </select>
                     <div class="text-xs text-gray-500 text-center mt-2">
                         Select card type for new imports
@@ -253,6 +255,18 @@
                 width: 73,
                 height: 80,
                 description: '73mm × 80mm'
+            },
+            'inner-dial': {
+                name: 'Inner Dial (X-Wing)',
+                width: 43,
+                height: 43,
+                description: '43mm diameter (round)'
+            },
+            'front-dial': {
+                name: 'Front Dial (X-Wing)',
+                width: 50,
+                height: 50,
+                description: '50mm diameter (round)'
             }
         };
         
@@ -384,6 +398,10 @@
             let isRotated = false;
             let cardWidth, cardHeight;
             
+            // For square cards (ships) and round dials, no rotation detection needed
+            if (cardTypeData.width === cardTypeData.height || 
+                cardType === 'inner-dial' || 
+                cardType === 'front-dial') {
             // For square cards (medium and large ships), no rotation detection needed
             if (cardTypeData.width === cardTypeData.height) {
                 isRotated = false;
@@ -566,13 +584,21 @@
             const img = document.createElement('img');
             img.src = image.src;
             img.alt = image.name;
-            img.className = `w-full h-full object-cover rounded border-2 border-transparent group-hover:border-blue-400 transition-colors ${image.isRotated ? 'image-rotated' : ''}`;
+            // Set appropriate object-fit class based on card type
+            const objectFitClass = (image.cardType === 'inner-dial' || image.cardType === 'front-dial') ? 'object-contain' : 'object-cover';
+            img.className = `w-full h-full ${objectFitClass} rounded border-2 border-transparent group-hover:border-blue-400 transition-colors ${image.isRotated ? 'image-rotated' : ''}`;
             img.draggable = false;
             
             // Ensure image fills container properly
             img.style.width = '100%';
             img.style.height = '100%';
-            img.style.objectFit = 'cover';
+            
+            // For dials, use contain to ensure the full circular image is visible
+            if (image.cardType === 'inner-dial' || image.cardType === 'front-dial') {
+                img.style.objectFit = 'contain';
+            } else {
+                img.style.objectFit = 'cover';
+            }
             
             // For rotated images, ensure the rotation is applied to the container
             if (image.isRotated) {
@@ -600,21 +626,56 @@
 
             // Resize functionality removed per application.mdc
 
-            // Add rotation indicator
-            const rotationIndicator = document.createElement('div');
-            rotationIndicator.className = 'control-top-left bg-blue-500 text-white text-xs px-1 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:bg-blue-600 select-none';
-            rotationIndicator.style.top = controlPositions.rotate.top;
-            rotationIndicator.style.left = controlPositions.rotate.left;
-            rotationIndicator.textContent = image.isRotated ? '↻' : '↻';
-            rotationIndicator.title = image.isRotated ? 'Click to rotate back (88×63.5mm)' : 'Click to rotate (63.5×88mm)';
-            rotationIndicator.onclick = (e) => {
-                e.preventDefault();
+            // Add rotation indicator (only for non-dial cards)
+            let rotationIndicator = null;
+            if (image.cardType !== 'inner-dial' && image.cardType !== 'front-dial') {
+                rotationIndicator = document.createElement('div');
+                rotationIndicator.className = 'control-top-left bg-blue-500 text-white text-xs px-1 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:bg-blue-600 select-none';
+                rotationIndicator.style.top = controlPositions.rotate.top;
+                rotationIndicator.style.left = controlPositions.rotate.left;
+                rotationIndicator.textContent = image.isRotated ? '↻' : '↻';
+                rotationIndicator.title = image.isRotated ? 'Click to rotate back (88×63.5mm)' : 'Click to rotate (63.5×88mm)';
+                rotationIndicator.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('Rotation indicator clicked', { imageId: image.id });
+                    rotateImage(image.id);
+                };
+                rotationIndicator.onmousedown = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                };
+            }
+
+            // Add card type selector
+            const cardTypeSelect = document.createElement('select');
+            cardTypeSelect.className = 'control-bottom-left card-type-select bg-white text-gray-700 text-xs px-1 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:bg-gray-100 select-none border';
+            cardTypeSelect.style.bottom = controlPositions.cardType.bottom;
+            cardTypeSelect.style.left = controlPositions.cardType.left;
+            cardTypeSelect.style.fontSize = '10px';
+            cardTypeSelect.style.padding = '2px';
+            cardTypeSelect.title = 'Change card type';
+            
+            // Add options
+            Object.keys(CARD_TYPES).forEach(type => {
+                const option = document.createElement('option');
+                option.value = type;
+                option.textContent = CARD_TYPES[type].name;
+                if (type === image.cardType) {
+                    option.selected = true;
+                }
+                cardTypeSelect.appendChild(option);
+            });
+            
+            cardTypeSelect.onchange = (e) => {
                 e.stopPropagation();
-                console.log('Rotation indicator clicked', { imageId: image.id });
-                rotateImage(image.id);
+                console.log('Card type selector changed for image', image.id, 'to', e.target.value);
+                changeCardType(image.id, e.target.value);
             };
-            rotationIndicator.onmousedown = (e) => {
-                e.preventDefault();
+            cardTypeSelect.onmousedown = (e) => {
+                e.stopPropagation();
+            };
+            cardTypeSelect.onclick = (e) => {
                 e.stopPropagation();
             };
 
@@ -652,7 +713,9 @@
 
             container.appendChild(img);
             container.appendChild(removeBtn);
-            container.appendChild(rotationIndicator);
+            if (rotationIndicator) {
+                container.appendChild(rotationIndicator);
+            }
             container.appendChild(cardTypeSelect);
 
             // Add drag functionality for A4 layout
@@ -677,13 +740,15 @@
                 className: container.className 
             });
             
-            // Add double-click to rotate
-            container.ondblclick = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                console.log('A4 image double-clicked for rotation', { imageId: image.id });
-                rotateImage(image.id);
-            };
+            // Add double-click to rotate (only for non-dial cards)
+            if (image.cardType !== 'inner-dial' && image.cardType !== 'front-dial') {
+                container.ondblclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('A4 image double-clicked for rotation', { imageId: image.id });
+                    rotateImage(image.id);
+                };
+            }
 
             return container;
         }
@@ -1014,7 +1079,12 @@
                 // Update image element
                 const imgElement = element.querySelector('img');
                 if (imgElement) {
-                    imgElement.style.objectFit = image.isRotated ? 'contain' : 'cover';
+                    // For dials, use contain to ensure the full circular image is visible
+                    if (image.cardType === 'inner-dial' || image.cardType === 'front-dial') {
+                        imgElement.style.objectFit = 'contain';
+                    } else {
+                        imgElement.style.objectFit = image.isRotated ? 'contain' : 'cover';
+                    }
                 }
                 
                 // Update control positions
@@ -1027,11 +1097,19 @@
                     removeBtn.style.right = controlPositions.remove.right;
                 }
                 
-                // Update rotation indicator position
-                const rotationIndicator = element.querySelector('.control-top-left');
-                if (rotationIndicator) {
-                    rotationIndicator.style.top = controlPositions.rotate.top;
-                    rotationIndicator.style.left = controlPositions.rotate.left;
+                // Update rotation indicator position (only for non-dial cards)
+                if (image.cardType !== 'inner-dial' && image.cardType !== 'front-dial') {
+                    const rotationIndicator = element.querySelector('.control-top-left');
+                    if (rotationIndicator) {
+                        rotationIndicator.style.top = controlPositions.rotate.top;
+                        rotationIndicator.style.left = controlPositions.rotate.left;
+                    }
+                } else {
+                    // Remove rotation indicator for dials
+                    const rotationIndicator = element.querySelector('.control-top-left');
+                    if (rotationIndicator) {
+                        rotationIndicator.remove();
+                    }
                 }
                 
                 // Update card type selector position
@@ -1170,10 +1248,21 @@
                         yMm = yMm + (originalHeightMm - rotatedHeightMm) / 2;
                     }
                     
-                    const constrainedX = Math.max(0, Math.min(xMm, A4_WIDTH_MM - widthMm));
-                    const constrainedY = Math.max(0, Math.min(yMm, A4_HEIGHT_MM - heightMm));
-                    const constrainedWidth = Math.min(widthMm, A4_WIDTH_MM - constrainedX);
-                    const constrainedHeight = Math.min(heightMm, A4_HEIGHT_MM - constrainedY);
+                    // For dials, calculate proper dimensions based on image aspect ratio
+                    let finalWidthMm = widthMm;
+                    let finalHeightMm = heightMm;
+                    
+                    if (image.cardType === 'inner-dial' || image.cardType === 'front-dial') {
+                        // Calculate height based on the image's natural aspect ratio
+                        const aspectRatio = image.originalWidth / image.originalHeight;
+                        finalWidthMm = widthMm;
+                        finalHeightMm = widthMm / aspectRatio;
+                    }
+                    
+                    const constrainedX = Math.max(0, Math.min(xMm, A4_WIDTH_MM - finalWidthMm));
+                    const constrainedY = Math.max(0, Math.min(yMm, A4_HEIGHT_MM - finalHeightMm));
+                    const constrainedWidth = Math.min(finalWidthMm, A4_WIDTH_MM - constrainedX);
+                    const constrainedHeight = Math.min(finalHeightMm, A4_HEIGHT_MM - constrainedY);
                     
                     if (image.isRotated) {
                         // For rotated images, we need to rotate the image content
