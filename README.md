@@ -157,11 +157,6 @@ Then open `http://localhost:8000` in your browser.
 Cardlayer/
 ├── index.html                    # Single HTML file containing everything
 ├── README.md                    # This file
-├── .cursor/
-│   └── rules/
-│       └── project/
-│           ├── application.mdc  # Application requirements and rules
-│           └── rules.mdc        # Development rules
 └── .gitignore                   # Git ignore file
 ```
 
