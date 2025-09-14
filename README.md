@@ -4,16 +4,16 @@ A **pure client-side** web application for positioning trading card images on A4
 
 ## Features
 
-- **Multi-Size Card Support**: Support for different card types including Standard Cards and X-Wing ships
+- **Multi-Size Card Support**: Support for Standard Cards, X-Wing ships, and X-Wing dials
 - **Drag & Drop Interface**: Import images by dragging and dropping them directly onto the A4 layout
 - **A4 Layout Preview**: See exactly how your cards will appear on A4 paper (horizontal/landscape mode)
 - **Smart Image Positioning**: Click and drag to reposition images with grid snapping
-- **Image Rotation**: Rotate images 90° to change from vertical to horizontal orientation
-- **Card Type Selection**: Change card type of individual images after import
+- **Image Rotation**: Rotate images 90° to change from vertical to horizontal orientation (excludes dials)
+- **Card Type Selection**: Change card type of individual images after import with per-image dropdowns
 - **Alpha Channel Processing**: Automatic border trimming for PNG images with transparency
 - **Grid Snapping System**: Invisible 10px grid for perfect card alignment
 - **Smart Collision Detection**: Prevents images from overlapping when positioning
-- **PDF Generation**: Export your layout as a PDF file with proper image rotation
+- **PDF Generation**: Export your layout as a PDF file with proper image rotation and aspect ratio preservation
 - **Responsive Design**: Works on different screen sizes with proportional scaling
 - **No Build Process**: Just open the HTML file in any modern browser
 
@@ -21,8 +21,8 @@ A **pure client-side** web application for positioning trading card images on A4
 
 The application consists of two main sections (simplified design):
 
-1. **Tool Layout (30% left)**: Contains controls, image count, file importer, card type selector, and PDF generation button
-2. **A4 Layout (70% right)**: Interactive A4 paper preview where you position and rotate images
+1. **Tool Layout (30% left)**: Contains controls, image count, file importer, global card type selector, and PDF generation button
+2. **A4 Layout (70% right)**: Interactive A4 paper preview where you position and rotate images with individual card type controls
 
 ## Card Specifications
 
@@ -42,6 +42,8 @@ The application consists of two main sections (simplified design):
 - **Inner Dial (X-Wing)**: 43mm diameter (round)
 - **Front Dial (X-Wing)**: 50mm diameter (round)
 - **Circular Format**: Dials maintain their round proportions
+- **No Rotation**: Dials cannot be rotated (fixed orientation)
+- **Aspect Ratio Preservation**: Front dial maintains natural aspect ratio in PDF output
 
 ## How to Run
 
@@ -70,11 +72,11 @@ Then open `http://localhost:8000` in your browser.
 
 ## Usage
 
-1. **Select Card Type**: Choose the card type from the dropdown in the tool layout
+1. **Select Card Type**: Choose the card type from the global dropdown in the tool layout for new imports
 2. **Import Images**: Click "🃏 Import Cards" or drag & drop image files directly onto the A4 layout
-3. **Position Images**: Click and drag to reposition images on the A4 layout
-4. **Rotate Images**: Click the rotation indicator (↻) or double-click an image to rotate 90°
-5. **Change Card Type**: Hover over any image and use the dropdown to change its card type
+3. **Position Images**: Click and drag to reposition images on the A4 layout (grid snapping enabled)
+4. **Rotate Images**: Click the rotation indicator (↻) or double-click an image to rotate 90° (excludes dials)
+5. **Change Card Type**: Hover over any image and use the individual dropdown to change its card type
 6. **Remove Images**: Click the × button on any image to remove it
 7. **Generate PDF**: Click "📄 Generate PDF" when you're ready to export
 
@@ -86,6 +88,7 @@ Then open `http://localhost:8000` in your browser.
 - **Control Positioning**: Rotation, card type, and remove controls stay in fixed positions
 - **Collision Detection**: Uses correct dimensions for rotated images to prevent overlapping
 - **PDF Generation**: Exports rotated images with correct dimensions and proper rotation
+- **Dial Exclusion**: X-Wing dials (inner and front) cannot be rotated
 
 ### Grid Snapping System
 - **Invisible Grid**: 10px grid system for perfect alignment
@@ -106,10 +109,12 @@ Then open `http://localhost:8000` in your browser.
 - **Pre-processing**: Trims borders before resizing to standard card dimensions
 
 ### Card Type Management
-- **Multiple Types**: Support for Standard Cards and X-Wing ships
-- **Individual Control**: Change card type of any image after import
+- **Multiple Types**: Support for Standard Cards, X-Wing ships, and X-Wing dials
+- **Global Selection**: Choose card type for new imports via tool layout dropdown
+- **Individual Control**: Change card type of any image after import via per-image dropdown
 - **Visual Feedback**: Controls appear on hover for clean interface
 - **Real-time Updates**: Images resize and reposition automatically when type changes
+- **Type-Specific Behavior**: Dials use `object-fit: contain`, cards use `object-fit: cover`
 
 ## Technical Details
 
@@ -124,17 +129,20 @@ Then open `http://localhost:8000` in your browser.
 
 ## Recent Updates
 
-- **Multi-Size Card Support**: Added support for different card types including X-Wing ships
-- **Card Type Selection**: Individual card type dropdowns for each imported image
+- **Multi-Size Card Support**: Added support for Standard Cards, X-Wing ships, and X-Wing dials
+- **Card Type Selection**: Global and individual card type dropdowns for flexible image management
 - **Alpha Channel Processing**: Automatic PNG border trimming and transparency preservation
-- **Enhanced Rotation**: Complete image rotation system with proper visual feedback
+- **Enhanced Rotation**: Complete image rotation system with proper visual feedback (excludes dials)
 - **Grid Snapping**: Invisible 10px grid system for perfect card alignment
 - **Smart Collision**: Advanced collision detection for both normal and rotated images
-- **PDF Rotation**: Proper image content rotation in PDF generation
+- **PDF Rotation**: Proper image content rotation in PDF generation with canvas-based rotation
 - **Position Mapping**: Accurate position mapping between A4 layout and PDF
 - **Control Positioning**: Fixed control positions regardless of image rotation
 - **Bottom Padding**: Added 100px bottom padding for better screen utilization
 - **Aspect Ratio Preservation**: Images maintain proper proportions when rotated
+- **Dial Support**: Added Inner Dial (43mm) and Front Dial (50mm) with proper aspect ratio handling
+- **Type-Specific Rendering**: Different object-fit behavior for dials vs cards
+- **Merge Conflict Resolution**: Cleaned up codebase and consolidated all features
 
 ## Browser Support
 
