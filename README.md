@@ -119,16 +119,17 @@ Then open `http://localhost:8000` in your browser.
 ## Technical Details
 
 - **Pure HTML/CSS/JavaScript** - no frameworks or build tools
-- **CDN Dependencies**: Tailwind CSS and jsPDF loaded from CDN
+- **CDN Dependencies**: Tailwind CSS and pdf-lib loaded from CDN
 - **Client-side only** - no server backend required
 - **A4 Dimensions**: 297mm × 210mm (horizontal/landscape mode)
-- **PDF Generation**: Uses jsPDF library with canvas-based image rotation
+- **PDF Generation**: Uses pdf-lib library with canvas-based image rotation
 - **Grid System**: 10px invisible grid for precise positioning
 - **Collision Detection**: Real-time collision prevention with effective dimensions
 - **Responsive Scaling**: A4 layout scales to fit screen with 100px bottom padding
 
 ## Recent Updates
 
+- **PDF Library Migration** (2025-11-15): Migrated from jsPDF to pdf-lib for better compression, smaller file sizes, and improved PDF structure
 - **Multi-Size Card Support**: Added support for Standard Cards, X-Wing ships, and X-Wing dials
 - **Card Type Selection**: Global and individual card type dropdowns for flexible image management
 - **Alpha Channel Processing**: Automatic PNG border trimming and transparency preservation
@@ -171,3 +172,117 @@ This is a **zero-dependency** solution. Just open `index.html` in your browser a
 ## License
 
 MIT License
+
+---
+
+## Development Recommendations & Roadmap
+
+### High Priority Improvements
+
+#### 1. Error Handling
+- Add try-catch blocks throughout the application
+- Specific locations needing error handling:
+  - `trimImageBorders()` - canvas operations can fail
+  - `generatePDF()` - image loading/PDF creation can fail
+  - `processFiles()` - file reading can fail
+  - Image loading in rotation operations
+- Display user-friendly error messages for failed operations
+
+#### 2. Loading States & User Feedback
+- Add loading overlay during PDF generation
+- Show progress indicators for large file processing
+- Display file count and processing status during import
+- Add success/error notifications after operations
+
+#### 3. Input Validation
+- Validate file sizes (recommend max 10MB per image)
+- Validate image dimensions (recommend max 4096px)
+- Check file types before processing
+- Warn users about memory usage with many large images
+
+#### 4. PDF Generation Enhancement ✅ **COMPLETED**
+- **Migrated from jsPDF to pdf-lib** for better:
+  - Compression and smaller file sizes
+  - Native rotation handling
+  - Better image quality preservation
+  - Improved PDF structure and compatibility
+- Simplified rotation logic with better canvas handling
+- Maintained WYSIWYG text rendering for ship names (rendered as images for font consistency)
+
+### Medium Priority Improvements
+
+#### 1. Code Organization
+- Separate single HTML file into modular structure:
+  - `css/styles.css` - All styling
+  - `js/config.js` - Constants and card type definitions
+  - `js/imageProcessor.js` - Image processing functions
+  - `js/cardManager.js` - Card management logic
+  - `js/dragDrop.js` - Drag/drop/collision detection
+  - `js/pdfGenerator.js` - PDF generation
+  - `js/main.js` - Initialization and event listeners
+
+#### 2. Performance Optimizations
+- Debounce window resize events (currently causes lag)
+- Optimize `trimImageBorders()` with downsampled detection
+- Use `requestAnimationFrame` for smoother drag operations
+- Consider `URL.createObjectURL()` instead of data URLs to reduce memory usage
+
+#### 3. Keyboard Shortcuts
+- `Delete` - Remove selected image
+- `R` - Rotate selected image
+- `Ctrl+S` - Generate PDF
+- `Ctrl+Z` / `Ctrl+Y` - Undo/Redo
+- Arrow keys - Nudge selected image position
+
+#### 4. Enhanced UI/UX
+- Add zoom controls for A4 layout
+- Show dimension tooltips during drag
+- Highlight selected image with border
+- Add ruler guides along A4 edges
+- Multi-select support (Shift+click)
+
+### Low Priority Improvements (Nice to Have)
+
+#### 1. Undo/Redo System
+- Implement history stack for all operations
+- Track position changes, rotations, additions, deletions
+- Keyboard shortcuts for quick access
+- Visual indication of undo/redo availability
+
+#### 2. Save/Load Layouts
+- Export layout as JSON with embedded images
+- Import previously saved layouts
+- Auto-save to localStorage
+- Template system for common layouts
+
+#### 3. Advanced Features
+- Snap-to-card alignment (not just grid)
+- Distribution tools (align left/right/center, space evenly)
+- Duplicate layout across multiple pages
+- Print preview mode
+- Export as PNG/JPG image instead of PDF
+- Batch import with automatic layout
+
+#### 4. Accessibility Improvements
+- Full keyboard navigation support
+- Screen reader announcements for operations
+- High contrast mode option
+- Configurable font sizes for UI
+
+### Performance Targets
+- Import processing: <500ms per image
+- PDF generation: <2s for 20 cards
+- Drag operations: 60fps
+- Window resize: <100ms response
+
+### Memory Management
+- Monitor and display memory usage
+- Warn when approaching browser limits
+- Implement image cleanup for removed cards
+- Add "Optimize Images" feature to reduce memory footprint
+
+### Browser Compatibility
+- Test and document mobile browser support
+- Add touch gesture support for tablets
+- Implement PWA features for offline use
+- Add iOS Safari workarounds if needed
