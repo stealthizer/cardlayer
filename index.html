@@ -572,10 +572,23 @@
 
         // Check for collision between two cards
         function checkCollision(card1, card2) {
-            return !(card1.x + card1.width <= card2.x || 
-                    card2.x + card2.width <= card1.x || 
-                    card1.y + card1.height <= card2.y || 
-                    card2.y + card2.height <= card1.y);
+            // Get effective dimensions (considering rotation)
+            const card1Dims = getEffectiveDimensions(card1);
+            const card2Dims = getEffectiveDimensions(card2);
+
+            return !(card1.x + card1Dims.width <= card2.x ||
+                    card2.x + card2Dims.width <= card1.x ||
+                    card1.y + card1Dims.height <= card2.y ||
+                    card2.y + card2Dims.height <= card1.y);
+        }
+
+        // Get effective dimensions for collision detection
+        // Note: width and height are already swapped during rotation, so just return them as-is
+        function getEffectiveDimensions(card) {
+            return {
+                width: card.width,
+                height: card.height
+            };
         }
 
         // Check if a position is valid (no collisions)
@@ -714,29 +727,25 @@
             container.dataset.imageId = image.id;
 
             const img = document.createElement('img');
-            img.src = image.src;
+            // Use rotated source if available, otherwise use original
+            img.src = image.isRotated && image.rotatedSrc ? image.rotatedSrc : image.src;
             img.alt = image.name;
             // Set appropriate object-fit class based on card type
             const objectFitClass = (image.cardType === 'inner-dial' || image.cardType === 'front-dial') ? 'object-contain' : 'object-cover';
-            img.className = `w-full h-full ${objectFitClass} rounded border-2 border-transparent group-hover:border-blue-400 transition-colors ${image.isRotated ? 'image-rotated' : ''}`;
+            img.className = `w-full h-full ${objectFitClass} rounded border-2 border-transparent group-hover:border-blue-400 transition-colors`;
             img.draggable = false;
-            
+
             // Ensure image fills container properly
             img.style.width = '100%';
             img.style.height = '100%';
-            
+
             // For dials, use contain to ensure the full circular image is visible
             if (image.cardType === 'inner-dial' || image.cardType === 'front-dial') {
                 img.style.objectFit = 'contain';
             } else {
+                // For rotated images, we need to ensure the image fits without cropping
+                // The container dimensions are already swapped, so just use cover
                 img.style.objectFit = 'cover';
-            }
-            
-            // For rotated images, ensure the rotation is applied to the container
-            if (image.isRotated) {
-                container.style.transform = 'rotate(90deg)';
-                // Ensure image maintains proper aspect ratio when rotated
-                img.style.objectFit = 'contain';
             }
 
             const controlPositions = getControlPositions(image.isRotated);
@@ -972,45 +981,31 @@
         function handleDrag(e) {
             console.log('handleDrag called', { isDragging, currentImage: currentImage?.id, clientX: e.clientX, clientY: e.clientY });
             if (!isDragging || !currentImage) return;
-            
+
             const newX = e.clientX - dragStart.x;
             const newY = e.clientY - dragStart.y;
-            
+
             // Only handle A4 canvas dragging now
             if (currentDragArea === 'a4' || !currentDragArea) {
                 // Moving within A4 area - convert to relative coordinates
                 const a4Rect = a4Canvas.getBoundingClientRect();
                 const relativeX = newX - a4Rect.left;
                 const relativeY = newY - a4Rect.top;
-                
+
                 // Get effective dimensions for boundary checking
-                const getEffectiveDimensions = (card) => {
-                    if (card.isRotated) {
-                        return {
-                            width: card.height,
-                            height: card.width
-                        };
-                    } else {
-                        return {
-                            width: card.width,
-                            height: card.height
-                        };
-                    }
-                };
-                
                 const effectiveDims = getEffectiveDimensions(currentImage);
                 const constrainedX = Math.max(0, Math.min(relativeX, a4Dimensions.width - effectiveDims.width));
                 const constrainedY = Math.max(0, Math.min(relativeY, a4Dimensions.height - effectiveDims.height));
-            
+
             // Snap to grid for easier alignment
             const snappedPosition = snapToGrid(constrainedX, constrainedY);
-            
+
             // Check for collisions with other cards (no stacking)
             const finalX = checkCollisions(snappedPosition.x, snappedPosition.y, currentImage.id);
-            
+
             currentImage.x = finalX;
             currentImage.y = snappedPosition.y;
-            
+
             const element = document.querySelector(`[data-image-id="${currentImage.id}"]`);
             if (element) {
                 element.style.left = finalX + 'px';
@@ -1023,31 +1018,24 @@
         function checkCollisions(x, y, currentId) {
             const currentCard = images.find(img => img.id === currentId);
             if (!currentCard) return x;
-            
-            // For collision detection, use the actual container dimensions
-            // since the visual bounds are determined by the container size
-            const currentDims = {
-                width: currentCard.width,
-                height: currentCard.height
-            };
-            
+
+            // Use effective dimensions (considering rotation)
+            const currentDims = getEffectiveDimensions(currentCard);
+
             for (const otherCard of images) {
                 if (otherCard.id === currentId) continue;
-                
-                const otherDims = {
-                    width: otherCard.width,
-                    height: otherCard.height
-                };
-                
-                // Check if cards would overlap using actual container dimensions
+
+                const otherDims = getEffectiveDimensions(otherCard);
+
+                // Check if cards would overlap using effective dimensions
                 const overlapX = x < otherCard.x + otherDims.width && x + currentDims.width > otherCard.x;
                 const overlapY = y < otherCard.y + otherDims.height && y + currentDims.height > otherCard.y;
-                
+
                 if (overlapX && overlapY) {
                     // Cards would overlap, find the nearest non-overlapping position
                     const leftDistance = Math.abs(x - (otherCard.x - currentDims.width));
                     const rightDistance = Math.abs(x - (otherCard.x + otherDims.width));
-                    
+
                     if (leftDistance < rightDistance) {
                         return Math.max(0, otherCard.x - currentDims.width);
                     } else {
@@ -1055,7 +1043,7 @@
                     }
                 }
             }
-            
+
             return x;
         }
 
@@ -1079,92 +1067,112 @@
 
         // Resize functionality removed per application.mdc - users cannot resize images
 
+        // Rotate image by pre-rotating the image data
+        async function rotateImageData(imageSrc, originalWidth, originalHeight) {
+            return new Promise((resolve) => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+
+                // Swap canvas dimensions for rotation
+                canvas.width = originalHeight;
+                canvas.height = originalWidth;
+
+                const img = new Image();
+                img.onload = () => {
+                    // Rotate the canvas 90 degrees clockwise
+                    ctx.translate(canvas.width / 2, canvas.height / 2);
+                    ctx.rotate(Math.PI / 2);
+                    ctx.drawImage(img, -img.width / 2, -img.height / 2);
+
+                    // Convert to data URL
+                    resolve(canvas.toDataURL('image/png'));
+                };
+                img.src = imageSrc;
+            });
+        }
+
         // Rotate image
-        function rotateImage(imageId) {
+        async function rotateImage(imageId) {
             const image = images.find(img => img.id === imageId);
             if (!image) return;
-            
+
             console.log('Rotating image', { imageId, wasRotated: image.isRotated });
-            
+
             // Toggle rotation state
             image.isRotated = !image.isRotated;
-            
-            // Update card dimensions in mm (for PDF generation) but keep container dimensions the same
+
+            // Swap width and height for both display and PDF dimensions
+            const tempWidth = image.width;
+            const tempHeight = image.height;
+            image.width = tempHeight;
+            image.height = tempWidth;
+
+            // Swap card dimensions in mm (for PDF generation)
+            const tempWidthMm = image.cardWidthMm;
+            const tempHeightMm = image.cardHeightMm;
+            image.cardWidthMm = tempHeightMm;
+            image.cardHeightMm = tempWidthMm;
+
+            // Swap original dimensions
+            const tempOriginalWidth = image.originalWidth;
+            const tempOriginalHeight = image.originalHeight;
+            image.originalWidth = tempOriginalHeight;
+            image.originalHeight = tempOriginalWidth;
+
+            // Pre-rotate the image data if rotating, or keep original if unrotating
             if (image.isRotated) {
-                image.cardWidthMm = CARD_HEIGHT_MM;  // 88mm
-                image.cardHeightMm = CARD_WIDTH_MM;  // 63.5mm
+                // Rotating: create rotated version
+                image.rotatedSrc = await rotateImageData(image.src, tempOriginalWidth, tempOriginalHeight);
             } else {
-                image.cardWidthMm = CARD_WIDTH_MM;   // 63.5mm
-                image.cardHeightMm = CARD_HEIGHT_MM; // 88mm
+                // Unrotating: clear rotated version to use original
+                image.rotatedSrc = null;
             }
-            
-            // No need to change container dimensions - just rotate the container
-            // The visual rotation will make it appear as if dimensions are swapped
-            
+
+            // Adjust position to keep the card centered at the same point
+            // When rotating, the visual center shifts, so we need to compensate
+            const centerX = image.x + tempWidth / 2;
+            const centerY = image.y + tempHeight / 2;
+            image.x = centerX - image.width / 2;
+            image.y = centerY - image.height / 2;
+
+            // Constrain to A4 bounds
+            const effectiveDims = getEffectiveDimensions(image);
+            image.x = Math.max(0, Math.min(image.x, a4Dimensions.width - effectiveDims.width));
+            image.y = Math.max(0, Math.min(image.y, a4Dimensions.height - effectiveDims.height));
+
             // Update DOM element
             const element = document.querySelector(`[data-image-id="${imageId}"]`);
             if (element) {
-                // Update container rotation only - keep original dimensions
-                if (image.isRotated) {
-                    element.style.transform = 'rotate(90deg)';
-                } else {
-                    element.style.transform = 'none';
-                }
-                
-                // Update image dimensions to match container
+                // Update container dimensions (swapped)
+                element.style.width = image.width + 'px';
+                element.style.height = image.height + 'px';
+                element.style.left = image.x + 'px';
+                element.style.top = image.y + 'px';
+
+                // Update image element with pre-rotated image
                 const imgElement = element.querySelector('img');
                 if (imgElement) {
-                    imgElement.style.width = '100%';
-                    imgElement.style.height = '100%';
-                    // Use contain for rotated images to maintain aspect ratio
-                    imgElement.style.objectFit = image.isRotated ? 'contain' : 'cover';
+                    // Use the rotated image source or original
+                    imgElement.src = image.isRotated ? image.rotatedSrc : image.src;
+                    imgElement.style.objectFit = 'cover';
                 }
-                
-                // Recalculate control positions for the new rotation state
-                const getControlPositions = (isRotated, containerWidth, containerHeight) => {
-                    if (isRotated) {
-                        // When container is rotated 90°, the "top" of the rotated image is at the left side
-                        // Controls should be positioned at the left and right sides of the container
-                        return {
-                            topLeft: { top: '50%', left: '4px', transform: 'translateY(-50%)' },      // Left side of container (top of rotated image)
-                            topRight: { top: '50%', right: '4px', transform: 'translateY(-50%)' }     // Right side of container (top of rotated image)
-                        };
-                    } else {
-                        // Normal orientation - controls at top-left and top-right
-                        return {
-                            topLeft: { top: '4px', left: '4px' },
-                            topRight: { top: '4px', right: '4px' }
-                        };
-                    }
-                };
-                
-                const controlPositions = getControlPositions(image.isRotated, image.width, image.height);
-                
-                // Update control positions
+
+                // Update rotation indicator
                 const rotationIndicator = element.querySelector('.control-top-left');
                 if (rotationIndicator) {
-                    rotationIndicator.style.top = controlPositions.topLeft.top;
-                    rotationIndicator.style.left = controlPositions.topLeft.left;
-                    if (controlPositions.topLeft.transform) {
-                        rotationIndicator.style.transform = controlPositions.topLeft.transform;
-                    }
-                    rotationIndicator.textContent = image.isRotated ? '↻' : '↻';
-                    rotationIndicator.title = image.isRotated ? 'Click to rotate back (88×63.5mm)' : 'Click to rotate (63.5×88mm)';
-                }
-                
-                const removeBtn = element.querySelector('.control-top-right');
-                if (removeBtn) {
-                    removeBtn.style.top = controlPositions.topRight.top;
-                    removeBtn.style.right = controlPositions.topRight.right;
-                    if (controlPositions.topRight.transform) {
-                        removeBtn.style.transform = controlPositions.topRight.transform;
-                    }
+                    rotationIndicator.title = image.isRotated ?
+                        `Click to rotate back (${image.cardHeightMm}×${image.cardWidthMm}mm)` :
+                        `Click to rotate (${image.cardHeightMm}×${image.cardWidthMm}mm)`;
                 }
             }
-            
-            // Gallery functionality removed per application.mdc
-            
-            console.log('Image rotated', { imageId, isRotated: image.isRotated, dimensions: { width: image.width, height: image.height }, cardDimensions: { width: image.cardWidthMm, height: image.cardHeightMm } });
+
+            console.log('Image rotated', {
+                imageId,
+                isRotated: image.isRotated,
+                dimensions: { width: image.width, height: image.height },
+                cardDimensions: { width: image.cardWidthMm, height: image.cardHeightMm },
+                position: { x: image.x, y: image.y }
+            });
         }
 
         // Add image to A4 canvas
@@ -1292,22 +1300,20 @@
             if (element) {
                 element.style.width = image.width + 'px';
                 element.style.height = image.height + 'px';
-                
-                // Update rotation
-                if (image.isRotated) {
-                    element.style.transform = 'rotate(90deg)';
-                } else {
-                    element.style.transform = 'none';
-                }
-                
+                element.style.left = image.x + 'px';
+                element.style.top = image.y + 'px';
+
                 // Update image element
                 const imgElement = element.querySelector('img');
                 if (imgElement) {
+                    // Use rotated source if available
+                    imgElement.src = image.isRotated && image.rotatedSrc ? image.rotatedSrc : image.src;
+
                     // For dials, use contain to ensure the full circular image is visible
                     if (image.cardType === 'inner-dial' || image.cardType === 'front-dial') {
                         imgElement.style.objectFit = 'contain';
                     } else {
-                        imgElement.style.objectFit = image.isRotated ? 'contain' : 'cover';
+                        imgElement.style.objectFit = 'cover';
                     }
                 }
                 
@@ -1536,8 +1542,9 @@
                                 console.log('Auto-detected front-dial from filename:', file.name);
                             } else if (fileNameWithoutExt.startsWith('pilot')) {
                                 // Pilots are vertical cards (not rotated)
+                                detectedCardType = 'standard'; // Use standard as base type
                                 forceOrientation = false;
-                                console.log('Auto-detected pilot (vertical) from filename:', file.name);
+                                console.log('✓ Auto-detected pilot (vertical) from filename:', file.name, '→ 63.5mm × 88mm (vertical, not rotated)');
                             } else if (fileNameWithoutExt.startsWith('upgrade')) {
                                 // Upgrades are horizontal cards (88mm × 63.5mm, not rotated)
                                 isUpgrade = true;
@@ -1626,8 +1633,9 @@
                                 cardDims.height = tileHeightPx;
                                 cardDims.isRotated = false; // Base tiles use card type dimensions, not rotated
                                 console.log('✓ Applied base tile dimensions:', tileWidthMm + 'mm × ' + tileHeightMm + 'mm (' + tileWidthPx.toFixed(2) + 'px × ' + tileHeightPx.toFixed(2) + 'px)');
-                            } else if (forceOrientation !== null) {
+                            } else if (forceOrientation !== null && detectedCardType !== 'custom') {
                                 // Override orientation if forced by filename detection (pilots/upgrades)
+                                // Only apply if not a custom card type
                                 cardDims.isRotated = forceOrientation;
                                 // Update dimensions if rotation was forced
                                 if (forceOrientation) {
@@ -1639,11 +1647,14 @@
                                     cardDims.width = mmToPixels(cardDims.cardWidthMm);
                                     cardDims.height = mmToPixels(cardDims.cardHeightMm);
                                 } else {
-                                    // Vertical: ensure standard dimensions
-                                    cardDims.cardWidthMm = CARD_TYPES[detectedCardType].width;
-                                    cardDims.cardHeightMm = CARD_TYPES[detectedCardType].height;
-                                    cardDims.width = mmToPixels(cardDims.cardWidthMm);
-                                    cardDims.height = mmToPixels(cardDims.cardHeightMm);
+                                    // Vertical: ensure standard dimensions from CARD_TYPES
+                                    const cardTypeData = CARD_TYPES[detectedCardType];
+                                    if (cardTypeData) {
+                                        cardDims.cardWidthMm = cardTypeData.width;
+                                        cardDims.cardHeightMm = cardTypeData.height;
+                                        cardDims.width = mmToPixels(cardDims.cardWidthMm);
+                                        cardDims.height = mmToPixels(cardDims.cardHeightMm);
+                                    }
                                 }
                             }
                         
@@ -1738,23 +1749,13 @@
             // Process images sequentially to handle async operations
             for (const image of images) {
                 try {
-                    // Calculate position in mm
-                    let xMm = pixelsToMm(image.x / a4Dimensions.scale);
-                    let yMm = pixelsToMm(image.y / a4Dimensions.scale);
+                    // Calculate position in mm (converting from scaled pixels back to mm)
+                    const xMm = pixelsToMm(image.x / a4Dimensions.scale);
+                    const yMm = pixelsToMm(image.y / a4Dimensions.scale);
+
+                    // Use the card dimensions directly (already in mm and correctly swapped if rotated)
                     const widthMm = image.cardWidthMm;
                     const heightMm = image.cardHeightMm;
-
-                    // For rotated images, adjust the position to match visual bounds
-                    if (image.isRotated) {
-                        const originalWidthMm = CARD_WIDTH_MM;
-                        const originalHeightMm = CARD_HEIGHT_MM;
-                        const rotatedWidthMm = CARD_HEIGHT_MM;
-                        const rotatedHeightMm = CARD_WIDTH_MM;
-
-                        // Adjust position to account for the visual offset of rotation
-                        xMm = xMm + (originalWidthMm - rotatedWidthMm) / 2;
-                        yMm = yMm + (originalHeightMm - rotatedHeightMm) / 2;
-                    }
 
                     // For dials, calculate proper dimensions based on image aspect ratio
                     let finalWidthMm = widthMm;
@@ -1780,40 +1781,9 @@
 
                     let imageToEmbed;
 
-                    if (image.isRotated) {
-                        // For rotated images, we need to rotate the image content
-                        const canvas = document.createElement('canvas');
-                        const ctx = canvas.getContext('2d');
-
-                        // Set canvas size to the rotated dimensions
-                        canvas.width = image.originalHeight;
-                        canvas.height = image.originalWidth;
-
-                        // Load and rotate the image
-                        await new Promise((resolve, reject) => {
-                            const img = new Image();
-                            img.onload = () => {
-                                try {
-                                    // Rotate the canvas 90 degrees
-                                    ctx.translate(canvas.width / 2, canvas.height / 2);
-                                    ctx.rotate(Math.PI / 2);
-                                    ctx.drawImage(img, -img.width / 2, -img.height / 2);
-                                    resolve();
-                                } catch (error) {
-                                    reject(error);
-                                }
-                            };
-                            img.onerror = reject;
-                            img.src = image.src;
-                        });
-
-                        // Convert canvas to data URL
-                        const rotatedDataUrl = canvas.toDataURL('image/png');
-                        imageToEmbed = await loadImageFromDataUrl(rotatedDataUrl);
-                    } else {
-                        // For normal images, embed directly
-                        imageToEmbed = await loadImageFromDataUrl(image.src);
-                    }
+                    // Use pre-rotated source if available, otherwise use original
+                    const imageSrc = image.isRotated && image.rotatedSrc ? image.rotatedSrc : image.src;
+                    imageToEmbed = await loadImageFromDataUrl(imageSrc);
 
                     // PDF coordinates are from bottom-left, so we need to flip Y
                     const pdfY = pageHeight - yPoints - heightPoints;
