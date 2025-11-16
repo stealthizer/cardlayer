@@ -84,7 +84,13 @@
         .image-rotated {
             transform: rotate(90deg);
         }
-        
+
+        .image-selected {
+            outline: 3px solid #3b82f6;
+            outline-offset: 2px;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+
         .control-top-left {
             position: absolute;
             z-index: 10;
@@ -783,6 +789,7 @@
         let currentDragArea = null; // 'import' or 'a4'
         let a4Dimensions = { width: 0, height: 0, scale: 1 };
         let isShiftPressed = false; // Track Shift key for ignoring collisions
+        let selectedImageId = null; // Track selected image for keyboard shortcuts
 
         // DOM elements
         const fileInput = document.getElementById('fileInput');
@@ -1051,13 +1058,24 @@
                 startDrag(image, e);
             };
             
-            console.log('A4 image element created with event handlers', { 
-                imageId: image.id, 
+            console.log('A4 image element created with event handlers', {
+                imageId: image.id,
                 hasOnmousedown: !!container.onmousedown,
                 hasOndblclick: !!container.ondblclick,
-                className: container.className 
+                className: container.className
             });
-            
+
+            // Add click handler to select image
+            container.onclick = (e) => {
+                // Don't select if clicking on control buttons
+                if (e.target.tagName === 'BUTTON' ||
+                    e.target.tagName === 'SELECT' ||
+                    e.target.tagName === 'INPUT') {
+                    return;
+                }
+                selectImage(image.id);
+            };
+
             // Add double-click to rotate (only for non-dial cards)
             if (image.cardType !== 'inner-dial' && image.cardType !== 'front-dial') {
                 container.ondblclick = (e) => {
@@ -1338,13 +1356,47 @@
             if (element) {
                 element.remove();
             }
-            
+
+            // Clear selection if the removed image was selected
+            if (selectedImageId === id) {
+                selectedImageId = null;
+            }
+
             // Show empty state if no images
             if (images.length === 0) {
                 a4EmptyState.style.display = 'flex';
             }
-            
+
             updateUI();
+        }
+
+        // Select image for keyboard shortcuts
+        function selectImage(id) {
+            // Remove selection from previously selected image
+            if (selectedImageId) {
+                const prevElement = document.querySelector(`[data-image-id="${selectedImageId}"]`);
+                if (prevElement) {
+                    prevElement.classList.remove('image-selected');
+                }
+            }
+
+            // Set new selection
+            selectedImageId = id;
+            const element = document.querySelector(`[data-image-id="${id}"]`);
+            if (element) {
+                element.classList.add('image-selected');
+            }
+        }
+
+        // Deselect current image
+        function deselectImage() {
+            if (selectedImageId) {
+                const element = document.querySelector(`[data-image-id="${selectedImageId}"]`);
+                if (element) {
+                    element.classList.remove('image-selected');
+                }
+                selectedImageId = null;
+            }
         }
 
         function cloneImage(id) {
@@ -2155,7 +2207,45 @@
             console.log('Card type changed to:', selectedCardType);
         });
 
+        // Keyboard shortcuts for selected image
+        document.addEventListener('keydown', (e) => {
+            // Don't trigger shortcuts if user is typing in an input field
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+                return;
+            }
 
+            // If no image is selected, ignore keyboard shortcuts
+            if (!selectedImageId) {
+                return;
+            }
+
+            const selectedImage = images.find(img => img.id === selectedImageId);
+            if (!selectedImage) {
+                return;
+            }
+
+            // R key - Rotate image (only for non-dial cards)
+            if (e.key === 'r' || e.key === 'R') {
+                e.preventDefault();
+                if (selectedImage.cardType !== 'inner-dial' && selectedImage.cardType !== 'front-dial') {
+                    rotateImage(selectedImageId);
+                }
+            }
+
+            // Backspace or Delete key - Remove image
+            if (e.key === 'Backspace' || e.key === 'Delete') {
+                e.preventDefault();
+                removeImage(selectedImageId);
+            }
+        });
+
+        // Deselect image when clicking on A4 canvas background
+        a4Canvas.addEventListener('click', (e) => {
+            // Only deselect if clicking directly on the canvas (not on an image)
+            if (e.target === a4Canvas) {
+                deselectImage();
+            }
+        });
 
         window.onresize = () => {
             initA4Dimensions();
