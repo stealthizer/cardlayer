@@ -186,10 +186,12 @@
                 <div class="bg-gray-50 rounded-lg p-3">
                     <h3 class="text-sm font-semibold text-gray-900 mb-2">Card Type</h3>
                     <select id="cardTypeSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="custom" selected>Custom (Original Size)</option>
                         <option value="standard">Standard Card (63.5×88mm)</option>
                         <option value="small-ship">Small Ship (X-Wing) (32×38mm)</option>
                         <option value="medium-ship">Medium Ship (X-Wing) (54×61mm)</option>
                         <option value="large-ship">Large Ship (X-Wing) (73×80mm)</option>
+                        <option value="huge-ship">Huge Ship (X-Wing) (80.5×224mm)</option>
                         <option value="inner-dial">Inner Dial (X-Wing) (43mm)</option>
                         <option value="front-dial">Front Dial (X-Wing) (50mm)</option>
                     </select>
@@ -225,7 +227,7 @@
                         <p>  - <strong>dial-front</strong> → front dial</p>
                         <p>  - <strong>dial -</strong> → inner dial (43mm, circular)</p>
                         <p>  - <strong>tile base</strong> or <strong>base tile</strong> - size → custom size</p>
-                        <p>    (small/medium/large)</p>
+                        <p>    (small/medium/large/huge)</p>
                         <p>• <strong>A4 Layout:</strong> Drag & rotate only</p>
                         <p>• Cards cannot stack or overlap</p>
                         <p>• Double-click or click ↻ to rotate</p>
@@ -340,6 +342,12 @@
                 width: 50,
                 height: 50,
                 description: '50mm diameter (round)'
+            },
+            'huge-ship': {
+                name: 'Huge Ship (X-Wing)',
+                width: 80.5,
+                height: 224,
+                description: '80.5mm × 224mm'
             }
         };
         
@@ -348,12 +356,12 @@
         const BASE_TILE_SIZE_MAP = {
             'small': 'small-ship',    // 32mm × 38mm
             'medium': 'medium-ship',  // 54mm × 61mm
-            'large': 'large-ship'     // 73mm × 80mm
-            // 'huge': to be defined later
+            'large': 'large-ship',     // 73mm × 80mm
+            'huge': 'huge-ship'       // 80.5 x 224mm
         };
         
         // Default card type
-        let selectedCardType = 'standard';
+        let selectedCardType = 'custom';
         
         // Grid snapping settings
         const GRID_SIZE = 10; // Grid size in pixels for snapping
@@ -1483,6 +1491,7 @@
                             let forceOrientation = null; // null = auto-detect, false = vertical, true = horizontal
                             let baseTileSize = null; // null or one of: 'small', 'medium', 'large', 'huge'
                             let applyInnerDialTreatment = false; // Flag to apply circular cropping for "dial -" files
+                            let isUpgrade = false; // Flag for upgrade cards (88mm × 63.5mm, horizontal, not rotated)
                             const fileNameLower = file.name.toLowerCase();
                             
                             // Check if filename starts with the keyword (followed by separator or end of name)
@@ -1509,11 +1518,11 @@
                                         const cardTypeData = CARD_TYPES[detectedCardType];
                                         console.log('✓ Auto-detected tile base from filename:', file.name, 'with size:', baseTileSize, '→', detectedCardType, '→', cardTypeData.width + 'mm × ' + cardTypeData.height + 'mm');
                                     } else {
-                                        console.warn('⚠ Unknown base tile size:', baseTileSize, '(supported: small, medium, large)');
+                                        console.warn('⚠ Unknown base tile size:', baseTileSize, '(supported: small, medium, large, huge)');
                                         baseTileSize = null;
                                     }
                                 } else {
-                                    console.warn('⚠ Tile base detected but could not parse size from filename:', file.name, '(expected format: "tile base - small/medium/large - name" or "base tile - small/medium/large - name")');
+                                    console.warn('⚠ Tile base detected but could not parse size from filename:', file.name, '(expected format: "tile base - small/medium/large/huge - name" or "base tile - small/medium/large/huge - name")');
                                 }
                             } else if (fileNameWithoutExt.startsWith('dial -') || (fileNameWithoutExt.startsWith('dial-') && !fileNameWithoutExt.startsWith('dial-front'))) {
                                 // Detect "dial -" or "dial-" (but not "dial-front")
@@ -1530,9 +1539,11 @@
                                 forceOrientation = false;
                                 console.log('Auto-detected pilot (vertical) from filename:', file.name);
                             } else if (fileNameWithoutExt.startsWith('upgrade')) {
-                                // Upgrades are horizontal cards (rotated)
-                                forceOrientation = true;
-                                console.log('Auto-detected upgrade (horizontal) from filename:', file.name);
+                                // Upgrades are horizontal cards (88mm × 63.5mm, not rotated)
+                                isUpgrade = true;
+                                detectedCardType = 'standard'; // Use standard as base type
+                                forceOrientation = false; // Not rotated
+                                console.log('✓ Auto-detected upgrade from filename:', file.name, '→ 88mm × 63.5mm (horizontal, not rotated)');
                             }
                             
                             // Apply circular cropping for inner dials
@@ -1545,8 +1556,31 @@
                                 });
                             }
                             
-                            // Calculate proper card dimensions based on orientation detection and detected card type
-                            const cardDims = calculateCardDimensions(processedImg.width, processedImg.height, detectedCardType);
+                            // Handle custom cards (use original image dimensions, no modifications)
+                            let cardDims;
+                            if (detectedCardType === 'custom') {
+                                // Custom cards: use original image dimensions without any modifications
+                                const originalWidthPx = processedImg.width;
+                                const originalHeightPx = processedImg.height;
+                                // Convert pixels to mm for PDF generation (assuming 96 DPI)
+                                const originalWidthMm = pixelsToMm(originalWidthPx);
+                                const originalHeightMm = pixelsToMm(originalHeightPx);
+                                
+                                cardDims = {
+                                    width: originalWidthPx,
+                                    height: originalHeightPx,
+                                    isRotated: false,
+                                    originalWidth: processedImg.width,
+                                    originalHeight: processedImg.height,
+                                    cardType: 'custom',
+                                    cardWidthMm: originalWidthMm,
+                                    cardHeightMm: originalHeightMm
+                                };
+                                console.log('✓ Custom card detected: using original dimensions', originalWidthPx + 'px × ' + originalHeightPx + 'px (' + originalWidthMm.toFixed(2) + 'mm × ' + originalHeightMm.toFixed(2) + 'mm)');
+                            } else {
+                                // Calculate proper card dimensions based on orientation detection and detected card type
+                                cardDims = calculateCardDimensions(processedImg.width, processedImg.height, detectedCardType);
+                            }
                             
                             // Override dimensions if inner dial treatment is needed (from "dial -" detection)
                             if (applyInnerDialTreatment) {
@@ -1559,6 +1593,18 @@
                                 cardDims.height = dialSizePx;
                                 cardDims.isRotated = false;
                                 console.log('✓ Applied inner dial dimensions from "dial -" detection: 43mm × 43mm');
+                            } else if (isUpgrade) {
+                                // Upgrade cards: 88mm × 63.5mm (horizontal, not rotated)
+                                const upgradeWidthMm = 88;
+                                const upgradeHeightMm = 63.5;
+                                const upgradeWidthPx = mmToPixels(upgradeWidthMm);
+                                const upgradeHeightPx = mmToPixels(upgradeHeightMm);
+                                cardDims.cardWidthMm = upgradeWidthMm;
+                                cardDims.cardHeightMm = upgradeHeightMm;
+                                cardDims.width = upgradeWidthPx;
+                                cardDims.height = upgradeHeightPx;
+                                cardDims.isRotated = false; // Upgrades are horizontal but not rotated
+                                console.log('✓ Applied upgrade card dimensions: 88mm × 63.5mm (horizontal, not rotated)');
                             } else if (baseTileSize !== null && BASE_TILE_SIZE_MAP[baseTileSize]) {
                                 // Apply base tile dimensions using full card type dimensions (width × height)
                                 const mappedCardType = BASE_TILE_SIZE_MAP[baseTileSize];
