@@ -582,14 +582,9 @@
                     card2.y + card2Dims.height <= card1.y);
         }
 
-        // Get effective dimensions for collision detection (swap width/height if rotated)
+        // Get effective dimensions for collision detection
+        // Note: width and height are already swapped during rotation, so just return them as-is
         function getEffectiveDimensions(card) {
-            if (card.isRotated) {
-                return {
-                    width: card.height,
-                    height: card.width
-                };
-            }
             return {
                 width: card.width,
                 height: card.height
