@@ -84,7 +84,13 @@
         .image-rotated {
             transform: rotate(90deg);
         }
-        
+
+        .image-selected {
+            outline: 3px solid #3b82f6;
+            outline-offset: 2px;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+
         .control-top-left {
             position: absolute;
             z-index: 10;
@@ -240,7 +246,8 @@
                         <p>  - <strong>tile base</strong> or <strong>base tile</strong> - size → custom size</p>
                         <p>    (small/medium/large/huge)</p>
                         <p>• <strong>A4 Layout:</strong> Drag & rotate only</p>
-                        <p>• Cards cannot stack or overlap</p>
+                        <p>• Cards auto-place without overlap</p>
+                        <p>• Hold <strong>Shift</strong> while dragging to ignore collisions</p>
                         <p>• Double-click or click ↻ to rotate</p>
                         <p>• Click × to remove cards</p>
                         <p>• Generate PDF when ready</p>
@@ -689,6 +696,34 @@
             return true;
         }
 
+        // Find the best auto-placement position for a new image
+        function findBestAutoPlacementPosition(image) {
+            const padding = GRID_SIZE; // Minimum padding between cards and canvas edges
+            
+            // If canvas is empty, place at top-left with padding
+            if (images.length === 0) {
+                const snapped = snapToGrid(padding, padding);
+                return { x: snapped.x, y: snapped.y };
+            }
+            
+            // Try to place in a grid layout (left-to-right, top-to-bottom)
+            const gridStep = GRID_SIZE * 2;
+            for (let y = padding; y < a4Dimensions.height - image.height; y += gridStep) {
+                for (let x = padding; x < a4Dimensions.width - image.width; x += gridStep) {
+                    const snapped = snapToGrid(x, y);
+                    if (isValidPosition(image, snapped.x, snapped.y)) {
+                        return { x: snapped.x, y: snapped.y };
+                    }
+                }
+            }
+            
+            // If grid placement fails, return center (fallback)
+            const centerX = (a4Dimensions.width - image.width) / 2;
+            const centerY = (a4Dimensions.height - image.height) / 2;
+            const snapped = snapToGrid(centerX, centerY);
+            return { x: snapped.x, y: snapped.y };
+        }
+        
         // Find nearest valid position
         function findNearestValidPosition(image, targetX, targetY) {
             const step = GRID_SIZE; // Use grid size as step size
@@ -702,28 +737,48 @@
                 return { x: snappedTarget.x, y: snappedTarget.y };
             }
             
-            // Search in expanding spiral using grid steps
+            // Search in expanding spiral using grid steps with more positions per ring
             for (let radius = step; radius <= step * maxAttempts; radius += step) {
-                const positions = [
-                    { x: snappedTarget.x, y: snappedTarget.y - radius }, // up
-                    { x: snappedTarget.x + radius, y: snappedTarget.y }, // right
-                    { x: snappedTarget.x, y: snappedTarget.y + radius }, // down
-                    { x: snappedTarget.x - radius, y: snappedTarget.y }, // left
-                ];
+                const positions = [];
                 
-                for (const pos of positions) {
-                    // Constrain to A4 bounds
-                    const constrainedX = Math.max(0, Math.min(pos.x, a4Dimensions.width - image.width));
-                    const constrainedY = Math.max(0, Math.min(pos.y, a4Dimensions.height - image.height));
+                // Generate positions in a circular pattern around the target
+                const numPositions = Math.max(8, Math.floor(radius / step) * 4);
+                for (let i = 0; i < numPositions; i++) {
+                    const angle = (i / numPositions) * 2 * Math.PI;
+                    const x = snappedTarget.x + Math.cos(angle) * radius;
+                    const y = snappedTarget.y + Math.sin(angle) * radius;
                     
-                    if (isValidPosition(image, constrainedX, constrainedY)) {
-                        return { x: constrainedX, y: constrainedY };
+                    // Snap to grid
+                    const snapped = snapToGrid(x, y);
+                    
+                    // Constrain to A4 bounds
+                    const constrainedX = Math.max(0, Math.min(snapped.x, a4Dimensions.width - image.width));
+                    const constrainedY = Math.max(0, Math.min(snapped.y, a4Dimensions.height - image.height));
+                    
+                    positions.push({ x: constrainedX, y: constrainedY });
+                }
+                
+                // Try all positions in this ring
+                for (const pos of positions) {
+                    if (isValidPosition(image, pos.x, pos.y)) {
+                        return { x: pos.x, y: pos.y };
                     }
                 }
             }
             
-            // If no valid position found, return original position
-            return { x: image.x, y: image.y };
+            // If no valid position found, try a systematic grid search starting from top-left
+            const gridStep = GRID_SIZE * 2;
+            for (let y = 0; y < a4Dimensions.height - image.height; y += gridStep) {
+                for (let x = 0; x < a4Dimensions.width - image.width; x += gridStep) {
+                    const snapped = snapToGrid(x, y);
+                    if (isValidPosition(image, snapped.x, snapped.y)) {
+                        return { x: snapped.x, y: snapped.y };
+                    }
+                }
+            }
+            
+            // If no valid position found, return original position (will overlap)
+            return { x: snappedTarget.x, y: snappedTarget.y };
         }
 
         // Global state
@@ -733,6 +788,8 @@
         let currentImage = null;
         let currentDragArea = null; // 'import' or 'a4'
         let a4Dimensions = { width: 0, height: 0, scale: 1 };
+        let isShiftPressed = false; // Track Shift key for ignoring collisions
+        let selectedImageId = null; // Track selected image for keyboard shortcuts
 
         // DOM elements
         const fileInput = document.getElementById('fileInput');
@@ -1001,13 +1058,24 @@
                 startDrag(image, e);
             };
             
-            console.log('A4 image element created with event handlers', { 
-                imageId: image.id, 
+            console.log('A4 image element created with event handlers', {
+                imageId: image.id,
                 hasOnmousedown: !!container.onmousedown,
                 hasOndblclick: !!container.ondblclick,
-                className: container.className 
+                className: container.className
             });
-            
+
+            // Add click handler to select image
+            container.onclick = (e) => {
+                // Don't select if clicking on control buttons
+                if (e.target.tagName === 'BUTTON' ||
+                    e.target.tagName === 'SELECT' ||
+                    e.target.tagName === 'INPUT') {
+                    return;
+                }
+                selectImage(image.id);
+            };
+
             // Add double-click to rotate (only for non-dial cards)
             if (image.cardType !== 'inner-dial' && image.cardType !== 'front-dial') {
                 container.ondblclick = (e) => {
@@ -1059,8 +1127,11 @@
 
         // Handle dragging
         function handleDrag(e) {
-            console.log('handleDrag called', { isDragging, currentImage: currentImage?.id, clientX: e.clientX, clientY: e.clientY });
+            console.log('handleDrag called', { isDragging, currentImage: currentImage?.id, clientX: e.clientX, clientY: e.clientY, shiftPressed: e.shiftKey });
             if (!isDragging || !currentImage) return;
+
+            // Update shift key state
+            isShiftPressed = e.shiftKey;
 
             const newX = e.clientX - dragStart.x;
             const newY = e.clientY - dragStart.y;
@@ -1080,8 +1151,8 @@
             // Snap to grid for easier alignment
             const snappedPosition = snapToGrid(constrainedX, constrainedY);
 
-            // Check for collisions with other cards (no stacking)
-            const finalX = checkCollisions(snappedPosition.x, snappedPosition.y, currentImage.id);
+            // Check for collisions with other cards (no stacking) - skip if Shift is pressed
+            const finalX = isShiftPressed ? snappedPosition.x : checkCollisions(snappedPosition.x, snappedPosition.y, currentImage.id);
 
             currentImage.x = finalX;
             currentImage.y = snappedPosition.y;
@@ -1090,6 +1161,13 @@
             if (element) {
                 element.style.left = finalX + 'px';
                 element.style.top = snappedPosition.y + 'px';
+                
+                // Add visual feedback when ignoring collisions
+                if (isShiftPressed) {
+                    element.style.opacity = '0.7';
+                } else {
+                    element.style.opacity = '1';
+                }
                 }
             }
         }
@@ -1136,8 +1214,13 @@
                 const element = document.querySelector(`[data-image-id="${currentImage.id}"]`);
                 if (element) {
                     element.classList.remove('dragging');
+                    // Reset opacity
+                    element.style.opacity = '1';
                 }
             }
+            
+            // Reset shift state
+            isShiftPressed = false;
             
             currentImage = null;
             currentDragArea = null;
@@ -1273,13 +1356,47 @@
             if (element) {
                 element.remove();
             }
-            
+
+            // Clear selection if the removed image was selected
+            if (selectedImageId === id) {
+                selectedImageId = null;
+            }
+
             // Show empty state if no images
             if (images.length === 0) {
                 a4EmptyState.style.display = 'flex';
             }
-            
+
             updateUI();
+        }
+
+        // Select image for keyboard shortcuts
+        function selectImage(id) {
+            // Remove selection from previously selected image
+            if (selectedImageId) {
+                const prevElement = document.querySelector(`[data-image-id="${selectedImageId}"]`);
+                if (prevElement) {
+                    prevElement.classList.remove('image-selected');
+                }
+            }
+
+            // Set new selection
+            selectedImageId = id;
+            const element = document.querySelector(`[data-image-id="${id}"]`);
+            if (element) {
+                element.classList.add('image-selected');
+            }
+        }
+
+        // Deselect current image
+        function deselectImage() {
+            if (selectedImageId) {
+                const element = document.querySelector(`[data-image-id="${selectedImageId}"]`);
+                if (element) {
+                    element.classList.remove('image-selected');
+                }
+                selectedImageId = null;
+            }
         }
 
         function cloneImage(id) {
@@ -1743,8 +1860,8 @@
                             id: Math.random().toString(36).substr(2, 9),
                                 src: processedDataUrl,
                             name: file.name,
-                            x: (a4Dimensions.width - cardWidthScaled) / 2,
-                            y: (a4Dimensions.height - cardHeightScaled) / 2,
+                            x: 0, // Temporary, will be set by auto-placement
+                            y: 0, // Temporary, will be set by auto-placement
                             width: cardWidthScaled,
                             height: cardHeightScaled,
                                 originalWidth: processedImg.width,
@@ -1756,9 +1873,12 @@
                                 shipName: cardDims.cardType === 'front-dial' ? '' : undefined // Only front dials have ship names
                         };
                         
-                        // Constrain to A4 bounds
-                        image.x = Math.max(0, Math.min(image.x, a4Dimensions.width - image.width));
-                        image.y = Math.max(0, Math.min(image.y, a4Dimensions.height - image.height));
+                        // Auto-place image using smart grid-based positioning
+                        const autoPosition = findBestAutoPlacementPosition(image);
+                        image.x = autoPosition.x;
+                        image.y = autoPosition.y;
+                        
+                        console.log('Auto-placed image:', image.name, 'at', { x: image.x, y: image.y });
                         
                         images.push(image);
                         addImageToCanvas(image);
@@ -2087,7 +2207,45 @@
             console.log('Card type changed to:', selectedCardType);
         });
 
+        // Keyboard shortcuts for selected image
+        document.addEventListener('keydown', (e) => {
+            // Don't trigger shortcuts if user is typing in an input field
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+                return;
+            }
 
+            // If no image is selected, ignore keyboard shortcuts
+            if (!selectedImageId) {
+                return;
+            }
+
+            const selectedImage = images.find(img => img.id === selectedImageId);
+            if (!selectedImage) {
+                return;
+            }
+
+            // R key - Rotate image (only for non-dial cards)
+            if (e.key === 'r' || e.key === 'R') {
+                e.preventDefault();
+                if (selectedImage.cardType !== 'inner-dial' && selectedImage.cardType !== 'front-dial') {
+                    rotateImage(selectedImageId);
+                }
+            }
+
+            // Backspace or Delete key - Remove image
+            if (e.key === 'Backspace' || e.key === 'Delete') {
+                e.preventDefault();
+                removeImage(selectedImageId);
+            }
+        });
+
+        // Deselect image when clicking on A4 canvas background
+        a4Canvas.addEventListener('click', (e) => {
+            // Only deselect if clicking directly on the canvas (not on an image)
+            if (e.target === a4Canvas) {
+                deselectImage();
+            }
+        });
 
         window.onresize = () => {
             initA4Dimensions();
