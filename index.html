@@ -191,6 +191,7 @@
                         <option value="small-ship">Small Ship (X-Wing) (32×38mm)</option>
                         <option value="medium-ship">Medium Ship (X-Wing) (54×61mm)</option>
                         <option value="large-ship">Large Ship (X-Wing) (73×80mm)</option>
+                        <option value="huge-ship">Huge Ship (X-Wing) (80.5×224mm)</option>
                         <option value="inner-dial">Inner Dial (X-Wing) (43mm)</option>
                         <option value="front-dial">Front Dial (X-Wing) (50mm)</option>
                     </select>
@@ -341,6 +342,12 @@
                 width: 50,
                 height: 50,
                 description: '50mm diameter (round)'
+            },
+            'huge-ship': {
+                name: 'Huge Ship (X-Wing)',
+                width: 80.5,
+                height: 224,
+                description: '80.5mm × 224mm'
             }
         };
         
@@ -349,11 +356,9 @@
         const BASE_TILE_SIZE_MAP = {
             'small': 'small-ship',    // 32mm × 38mm
             'medium': 'medium-ship',  // 54mm × 61mm
-            'large': 'large-ship'     // 73mm × 80mm
+            'large': 'large-ship',     // 73mm × 80mm
+            'huge': 'huge-ship'       // 80.5 x 224mm
         };
-        
-        // Huge base tile: height is fixed at 231mm, width is calculated from image aspect ratio
-        const HUGE_BASE_TILE_HEIGHT = 231; // Fixed height in mm
         
         // Default card type
         let selectedCardType = 'custom';
@@ -1506,12 +1511,8 @@
                                 
                                 if (sizeMatch) {
                                     baseTileSize = sizeMatch[1].toLowerCase();
-                                    // Map size to existing card type or use huge dimensions
-                                    if (baseTileSize === 'huge') {
-                                        detectedCardType = 'standard'; // Use standard as base type
-                                        forceOrientation = false; // Base tiles use card type dimensions, not rotated
-                                        console.log('✓ Auto-detected tile base from filename:', file.name, 'with size:', baseTileSize, '→ height: 231mm, width will be calculated from image aspect ratio');
-                                    } else if (BASE_TILE_SIZE_MAP[baseTileSize]) {
+                                    // Map size to existing card type
+                                    if (BASE_TILE_SIZE_MAP[baseTileSize]) {
                                         detectedCardType = BASE_TILE_SIZE_MAP[baseTileSize];
                                         forceOrientation = false; // Base tiles use card type dimensions, not rotated
                                         const cardTypeData = CARD_TYPES[detectedCardType];
@@ -1604,51 +1605,27 @@
                                 cardDims.height = upgradeHeightPx;
                                 cardDims.isRotated = false; // Upgrades are horizontal but not rotated
                                 console.log('✓ Applied upgrade card dimensions: 88mm × 63.5mm (horizontal, not rotated)');
-                            } else if (baseTileSize !== null) {
-                                if (baseTileSize === 'huge') {
-                                    // Apply huge base tile dimensions: height is fixed at 231mm, width calculated from image aspect ratio
-                                    const tileHeightMm = HUGE_BASE_TILE_HEIGHT; // Fixed height: 231mm
-                                    // Calculate width proportionally from image aspect ratio
-                                    const imageAspectRatio = processedImg.width / processedImg.height;
-                                    const tileWidthMm = tileHeightMm * imageAspectRatio;
-                                    const tileWidthPx = mmToPixels(tileWidthMm);
-                                    const tileHeightPx = mmToPixels(tileHeightMm);
-                                    console.log('Applying huge base tile dimensions:', {
-                                        size: baseTileSize,
-                                        imageAspectRatio: imageAspectRatio.toFixed(4),
-                                        imageDimensions: processedImg.width + 'px × ' + processedImg.height + 'px',
-                                        dimensionsMm: tileWidthMm.toFixed(2) + 'mm × ' + tileHeightMm + 'mm',
-                                        dimensionsPx: tileWidthPx.toFixed(2) + 'px × ' + tileHeightPx.toFixed(2) + 'px',
-                                        before: { width: cardDims.width, height: cardDims.height, widthMm: cardDims.cardWidthMm, heightMm: cardDims.cardHeightMm }
-                                    });
-                                    cardDims.cardWidthMm = tileWidthMm;
-                                    cardDims.cardHeightMm = tileHeightMm;
-                                    cardDims.width = tileWidthPx;
-                                    cardDims.height = tileHeightPx;
-                                    cardDims.isRotated = false; // Base tiles use card type dimensions, not rotated
-                                    console.log('✓ Applied huge base tile dimensions:', tileWidthMm.toFixed(2) + 'mm × ' + tileHeightMm + 'mm (' + tileWidthPx.toFixed(2) + 'px × ' + tileHeightPx.toFixed(2) + 'px)');
-                                } else if (BASE_TILE_SIZE_MAP[baseTileSize]) {
-                                    // Apply base tile dimensions using full card type dimensions (width × height)
-                                    const mappedCardType = BASE_TILE_SIZE_MAP[baseTileSize];
-                                    const cardTypeData = CARD_TYPES[mappedCardType];
-                                    const tileWidthMm = cardTypeData.width;
-                                    const tileHeightMm = cardTypeData.height;
-                                    const tileWidthPx = mmToPixels(tileWidthMm);
-                                    const tileHeightPx = mmToPixels(tileHeightMm);
-                                    console.log('Applying base tile dimensions:', {
-                                        size: baseTileSize,
-                                        cardType: mappedCardType,
-                                        dimensionsMm: tileWidthMm + 'mm × ' + tileHeightMm + 'mm',
-                                        dimensionsPx: tileWidthPx.toFixed(2) + 'px × ' + tileHeightPx.toFixed(2) + 'px',
-                                        before: { width: cardDims.width, height: cardDims.height, widthMm: cardDims.cardWidthMm, heightMm: cardDims.cardHeightMm }
-                                    });
-                                    cardDims.cardWidthMm = tileWidthMm;
-                                    cardDims.cardHeightMm = tileHeightMm;
-                                    cardDims.width = tileWidthPx;
-                                    cardDims.height = tileHeightPx;
-                                    cardDims.isRotated = false; // Base tiles use card type dimensions, not rotated
-                                    console.log('✓ Applied base tile dimensions:', tileWidthMm + 'mm × ' + tileHeightMm + 'mm (' + tileWidthPx.toFixed(2) + 'px × ' + tileHeightPx.toFixed(2) + 'px)');
-                                }
+                            } else if (baseTileSize !== null && BASE_TILE_SIZE_MAP[baseTileSize]) {
+                                // Apply base tile dimensions using full card type dimensions (width × height)
+                                const mappedCardType = BASE_TILE_SIZE_MAP[baseTileSize];
+                                const cardTypeData = CARD_TYPES[mappedCardType];
+                                const tileWidthMm = cardTypeData.width;
+                                const tileHeightMm = cardTypeData.height;
+                                const tileWidthPx = mmToPixels(tileWidthMm);
+                                const tileHeightPx = mmToPixels(tileHeightMm);
+                                console.log('Applying base tile dimensions:', {
+                                    size: baseTileSize,
+                                    cardType: mappedCardType,
+                                    dimensionsMm: tileWidthMm + 'mm × ' + tileHeightMm + 'mm',
+                                    dimensionsPx: tileWidthPx.toFixed(2) + 'px × ' + tileHeightPx.toFixed(2) + 'px',
+                                    before: { width: cardDims.width, height: cardDims.height, widthMm: cardDims.cardWidthMm, heightMm: cardDims.cardHeightMm }
+                                });
+                                cardDims.cardWidthMm = tileWidthMm;
+                                cardDims.cardHeightMm = tileHeightMm;
+                                cardDims.width = tileWidthPx;
+                                cardDims.height = tileHeightPx;
+                                cardDims.isRotated = false; // Base tiles use card type dimensions, not rotated
+                                console.log('✓ Applied base tile dimensions:', tileWidthMm + 'mm × ' + tileHeightMm + 'mm (' + tileWidthPx.toFixed(2) + 'px × ' + tileHeightPx.toFixed(2) + 'px)');
                             } else if (forceOrientation !== null) {
                                 // Override orientation if forced by filename detection (pilots/upgrades)
                                 cardDims.isRotated = forceOrientation;
