@@ -394,22 +394,97 @@
             return false;
         }
         
-        // Find the bounding box of non-transparent pixels
+        // Find the bounding box of non-transparent pixels (optimized with downsampling)
         function findBoundingBox(imageData) {
             const width = imageData.width;
             const height = imageData.height;
             const data = imageData.data;
             
+            // Use downsampling for initial detection (check every Nth pixel)
+            // Adaptive sampling: smaller for small images, larger for big images
+            const sampleRate = Math.max(1, Math.min(8, Math.floor(Math.min(width, height) / 100)));
+            
             let minX = width, minY = height, maxX = -1, maxY = -1;
             
-            for (let y = 0; y < height; y++) {
-                for (let x = 0; x < width; x++) {
+            // Phase 1: Coarse detection with downsampling
+            for (let y = 0; y < height; y += sampleRate) {
+                for (let x = 0; x < width; x += sampleRate) {
                     const alphaIndex = (y * width + x) * 4 + 3;
                     if (data[alphaIndex] > 0) { // Non-transparent pixel
                         minX = Math.min(minX, x);
                         minY = Math.min(minY, y);
                         maxX = Math.max(maxX, x);
                         maxY = Math.max(maxY, y);
+                    }
+                }
+            }
+            
+            // If no content found, return empty bounds
+            if (maxX === -1) {
+                return { x: 0, y: 0, width: 0, height: 0 };
+            }
+            
+            // Phase 2: Refine bounds with precise scanning in the detected regions
+            // Expand search area by sample rate to ensure we don't miss edge pixels
+            const searchMinX = Math.max(0, minX - sampleRate);
+            const searchMaxX = Math.min(width - 1, maxX + sampleRate);
+            const searchMinY = Math.max(0, minY - sampleRate);
+            const searchMaxY = Math.min(height - 1, maxY + sampleRate);
+            
+            // Reset bounds for precise detection
+            minX = width;
+            minY = height;
+            maxX = -1;
+            maxY = -1;
+            
+            // Scan top edge (find precise minY)
+            let foundTop = false;
+            for (let y = searchMinY; y <= searchMaxY && !foundTop; y++) {
+                for (let x = searchMinX; x <= searchMaxX; x++) {
+                    const alphaIndex = (y * width + x) * 4 + 3;
+                    if (data[alphaIndex] > 0) {
+                        minY = y;
+                        foundTop = true;
+                        break;
+                    }
+                }
+            }
+            
+            // Scan bottom edge (find precise maxY)
+            let foundBottom = false;
+            for (let y = searchMaxY; y >= searchMinY && !foundBottom; y--) {
+                for (let x = searchMinX; x <= searchMaxX; x++) {
+                    const alphaIndex = (y * width + x) * 4 + 3;
+                    if (data[alphaIndex] > 0) {
+                        maxY = y;
+                        foundBottom = true;
+                        break;
+                    }
+                }
+            }
+            
+            // Scan left edge (find precise minX)
+            let foundLeft = false;
+            for (let x = searchMinX; x <= searchMaxX && !foundLeft; x++) {
+                for (let y = minY; y <= maxY; y++) {
+                    const alphaIndex = (y * width + x) * 4 + 3;
+                    if (data[alphaIndex] > 0) {
+                        minX = x;
+                        foundLeft = true;
+                        break;
+                    }
+                }
+            }
+            
+            // Scan right edge (find precise maxX)
+            let foundRight = false;
+            for (let x = searchMaxX; x >= searchMinX && !foundRight; x--) {
+                for (let y = minY; y <= maxY; y++) {
+                    const alphaIndex = (y * width + x) * 4 + 3;
+                    if (data[alphaIndex] > 0) {
+                        maxX = x;
+                        foundRight = true;
+                        break;
                     }
                 }
             }
@@ -847,16 +922,13 @@
                 shipNameInput.title = 'Enter ship name (up to 2 lines)';
                 shipNameInput.rows = 1;
                 
-                // Position 34mm from the top of the image, with dynamic centering
-                const topOffsetMm = 34;
+                // Position 35.5mm from the top of the image for screen display
+                const topOffsetMm = 35.5;
                 const topOffsetPx = mmToPixels(topOffsetMm) * a4Dimensions.scale;
-                const centerOffsetMm = 3; // Keep center at 34mm + 3mm
-                const centerOffsetPx = mmToPixels(centerOffsetMm) * a4Dimensions.scale;
                 
-                // Function to update text box position based on its height
+                // Function to update text box position
                 const updateTextBoxPosition = (textarea) => {
-                    const textBoxHeightPx = textarea.offsetHeight || 20; // Get actual height or fallback
-                    const topPosition = topOffsetPx + centerOffsetPx - (textBoxHeightPx / 2);
+                    const topPosition = topOffsetPx;
                     textarea.style.top = topPosition + 'px';
                 };
                 
@@ -870,7 +942,7 @@
                     const upperValue = e.target.value.toUpperCase();
                     e.target.value = upperValue;
                     image.shipName = upperValue;
-                    console.log('Ship name changed for image', image.id, 'to', upperValue);
+                    console.log('Ship name changed for image', image.id, 'to', upperValue, 'Lines:', upperValue.split(/\r?\n/).length);
                     
                     // Auto-resize textarea
                     e.target.style.height = 'auto';
@@ -1361,16 +1433,13 @@
                         shipNameInput.title = 'Enter ship name (up to 2 lines)';
                         shipNameInput.rows = 1;
                         
-                        // Position 34mm from the top of the image, with dynamic centering
-                        const topOffsetMm = 34;
+                        // Position 35.5mm from the top of the image for screen display
+                        const topOffsetMm = 35.5;
                         const topOffsetPx = mmToPixels(topOffsetMm) * a4Dimensions.scale;
-                        const centerOffsetMm = 3; // Keep center at 34mm + 3mm
-                        const centerOffsetPx = mmToPixels(centerOffsetMm) * a4Dimensions.scale;
                         
-                        // Function to update text box position based on its height
+                        // Function to update text box position
                         const updateTextBoxPosition = (textarea) => {
-                            const textBoxHeightPx = textarea.offsetHeight || 20; // Get actual height or fallback
-                            const topPosition = topOffsetPx + centerOffsetPx - (textBoxHeightPx / 2);
+                            const topPosition = topOffsetPx;
                             textarea.style.top = topPosition + 'px';
                         };
                         
@@ -1411,14 +1480,11 @@
                         existingShipNameInput.value = upperValue;
                         image.shipName = upperValue;
                         
-                        // Recalculate position for existing text box
-                        const topOffsetMm = 34;
+                        // Recalculate position for existing text box (35.5mm for screen display)
+                        const topOffsetMm = 35.5;
                         const topOffsetPx = mmToPixels(topOffsetMm) * a4Dimensions.scale;
-                        const centerOffsetMm = 3; // Keep center at 34mm + 3mm
-                        const centerOffsetPx = mmToPixels(centerOffsetMm) * a4Dimensions.scale;
                         
-                        const textBoxHeightPx = existingShipNameInput.offsetHeight || 20;
-                        const topPosition = topOffsetPx + centerOffsetPx - (textBoxHeightPx / 2);
+                        const topPosition = topOffsetPx;
                         existingShipNameInput.style.top = topPosition + 'px';
                         
                         // Add uppercase conversion to existing input
@@ -1433,10 +1499,7 @@
                             // Auto-resize textarea
                             e.target.style.height = 'auto';
                             e.target.style.height = Math.min(e.target.scrollHeight, 32) + 'px';
-                            // Update position after resize
-                            const newTextBoxHeightPx = e.target.offsetHeight || 20;
-                            const newTopPosition = topOffsetPx + centerOffsetPx - (newTextBoxHeightPx / 2);
-                            e.target.style.top = newTopPosition + 'px';
+                            // Position remains at topOffsetPx (no dynamic centering)
                         };
                     }
                 } else {
@@ -1804,16 +1867,52 @@
 
                         // Set font properties (35% smaller for PDF)
                         const pdfFontSize = 7.8; // 12px * 0.65 = 7.8px (35% smaller)
-                        ctx.font = `bold ${pdfFontSize}px Verdana, sans-serif`;
-
-                        // Measure text dimensions
-                        const lines = image.shipName.trim().split('\n');
                         const lineHeight = 9.36; // 7.8px * 1.2 line-height
-
+                        
+                        // Set font for measurement
+                        ctx.font = `bold ${pdfFontSize}px Verdana, sans-serif`;
+                        
+                        // Max width based on textarea max-width (158px on screen at 12px font)
+                        // For PDF at 7.8px font, proportionally: 158 * (7.8 / 12) = 102.7px
+                        const maxLineWidth = 102.7;
+                        
+                        // Split text by explicit newlines first
+                        const explicitLines = image.shipName.trim().split(/\r?\n/);
+                        
+                        // Then wrap each line if it exceeds max width
+                        const lines = [];
+                        explicitLines.forEach(line => {
+                            const words = line.trim().split(' ');
+                            let currentLine = '';
+                            
+                            words.forEach((word, index) => {
+                                const testLine = currentLine ? currentLine + ' ' + word : word;
+                                const metrics = ctx.measureText(testLine);
+                                
+                                if (metrics.width > maxLineWidth && currentLine) {
+                                    // Line is too long, push current line and start new one
+                                    lines.push(currentLine);
+                                    currentLine = word;
+                                } else {
+                                    currentLine = testLine;
+                                }
+                            });
+                            
+                            // Push the last line
+                            if (currentLine) {
+                                lines.push(currentLine);
+                            }
+                        });
+                        
+                        console.log('PDF Generation - Ship name:', JSON.stringify(image.shipName), 'Wrapped lines:', lines, 'Line count:', lines.length);
+                        
+                        // Measure actual dimensions of wrapped lines
                         let maxWidth = 0;
                         lines.forEach(line => {
-                            const metrics = ctx.measureText(line.trim());
-                            maxWidth = Math.max(maxWidth, metrics.width);
+                            if (line.trim()) {
+                                const metrics = ctx.measureText(line.trim());
+                                maxWidth = Math.max(maxWidth, metrics.width);
+                            }
                         });
 
                         const textHeight = lines.length * lineHeight;
@@ -1830,17 +1929,19 @@
                         ctx.font = `bold ${pdfFontSize}px Verdana, sans-serif`;
                         ctx.fillStyle = '#000000';
                         ctx.textAlign = 'center';
-                        ctx.textBaseline = 'alphabetic';
+                        ctx.textBaseline = 'top'; // Changed from 'alphabetic' to 'top' for more predictable positioning
                         ctx.imageSmoothingEnabled = false;
 
                         // Clear canvas with transparent background
                         ctx.clearRect(0, 0, canvas.width / scale, canvas.height / scale);
 
-                        // Draw the text
+                        // Draw the text line by line
                         lines.forEach((line, index) => {
-                            if (line.trim()) {
-                                const yPos = (index * lineHeight) + pdfFontSize;
-                                ctx.fillText(line.trim(), (canvas.width / scale) / 2, yPos);
+                            const trimmedLine = line.trim();
+                            if (trimmedLine) {
+                                const yPos = index * lineHeight; // Simple calculation based on line index
+                                ctx.fillText(trimmedLine, (canvas.width / scale) / 2, yPos);
+                                console.log(`Drawing line ${index}: "${trimmedLine}" at y=${yPos}`);
                             }
                         });
 
