@@ -121,7 +121,7 @@
             border: 1px solid transparent;
             border-radius: 4px;
             padding: 2px 4px;
-            font-family: 'Verdana', sans-serif;
+            font-family: 'Bank Gothic', 'BankGothic', 'Arial Narrow', 'Arial', sans-serif;
             font-weight: bold;
             font-size: 12px;
             color: #333;
@@ -208,6 +208,17 @@
                     </button>
                     <div id="pdfStatus" class="text-xs text-gray-500 text-center mt-2">
                         Add cards first
+                    </div>
+                </div>
+
+                <!-- Font Status -->
+                <div class="bg-gray-50 rounded-lg p-3">
+                    <h3 class="text-sm font-semibold text-gray-900 mb-2">Ship Name Font</h3>
+                    <div id="fontStatus" class="text-xs text-gray-600 text-center">
+                        <span id="detectedFont" class="font-semibold text-blue-600">Detecting...</span>
+                    </div>
+                    <div class="text-xs text-gray-500 text-center mt-1">
+                        Used for front-dial cards
                     </div>
                 </div>
 
@@ -938,11 +949,8 @@
                 // Handle input changes
                 shipNameInput.oninput = (e) => {
                     e.stopPropagation();
-                    // Convert to uppercase
-                    const upperValue = e.target.value.toUpperCase();
-                    e.target.value = upperValue;
-                    image.shipName = upperValue;
-                    console.log('Ship name changed for image', image.id, 'to', upperValue, 'Lines:', upperValue.split(/\r?\n/).length);
+                    image.shipName = e.target.value;
+                    console.log('Ship name changed for image', image.id, 'to', e.target.value, 'Lines:', e.target.value.split(/\r?\n/).length);
                     
                     // Auto-resize textarea
                     e.target.style.height = 'auto';
@@ -1449,11 +1457,8 @@
                         // Handle input changes
                         shipNameInput.oninput = (e) => {
                             e.stopPropagation();
-                            // Convert to uppercase
-                            const upperValue = e.target.value.toUpperCase();
-                            e.target.value = upperValue;
-                            image.shipName = upperValue;
-                            console.log('Ship name changed for image', image.id, 'to', upperValue);
+                            image.shipName = e.target.value;
+                            console.log('Ship name changed for image', image.id, 'to', e.target.value);
                             
                             // Auto-resize textarea
                             e.target.style.height = 'auto';
@@ -1476,9 +1481,8 @@
                         element.appendChild(shipNameInput);
                     } else {
                         // Update existing ship name input value and position
-                        const upperValue = (image.shipName || '').toUpperCase();
-                        existingShipNameInput.value = upperValue;
-                        image.shipName = upperValue;
+                        existingShipNameInput.value = image.shipName || '';
+                        image.shipName = image.shipName || '';
                         
                         // Recalculate position for existing text box (35.5mm for screen display)
                         const topOffsetMm = 35.5;
@@ -1487,14 +1491,11 @@
                         const topPosition = topOffsetPx;
                         existingShipNameInput.style.top = topPosition + 'px';
                         
-                        // Add uppercase conversion to existing input
+                        // Handle input changes for existing input
                         existingShipNameInput.oninput = (e) => {
                             e.stopPropagation();
-                            // Convert to uppercase
-                            const upperValue = e.target.value.toUpperCase();
-                            e.target.value = upperValue;
-                            image.shipName = upperValue;
-                            console.log('Ship name changed for image', image.id, 'to', upperValue);
+                            image.shipName = e.target.value;
+                            console.log('Ship name changed for image', image.id, 'to', e.target.value);
                             
                             // Auto-resize textarea
                             e.target.style.height = 'auto';
@@ -1869,14 +1870,14 @@
                         const pdfFontSize = 7.8; // 12px * 0.65 = 7.8px (35% smaller)
                         const lineHeight = 9.36; // 7.8px * 1.2 line-height
                         
-                        // Set font for measurement
-                        ctx.font = `bold ${pdfFontSize}px Verdana, sans-serif`;
+                        // Set font for measurement (Bank Gothic Bold)
+                        ctx.font = `bold ${pdfFontSize}px "Bank Gothic", "BankGothic", "Arial Narrow", Arial, sans-serif`;
                         
                         // Max width based on textarea max-width (158px on screen at 12px font)
                         // For PDF at 7.8px font, proportionally: 158 * (7.8 / 12) = 102.7px
                         const maxLineWidth = 102.7;
                         
-                        // Split text by explicit newlines first
+                        // Split text by explicit newlines first (preserve case for Bank Gothic small caps)
                         const explicitLines = image.shipName.trim().split(/\r?\n/);
                         
                         // Then wrap each line if it exceeds max width
@@ -1926,7 +1927,7 @@
                         ctx.scale(scale, scale);
 
                         // Set font properties again after scaling
-                        ctx.font = `bold ${pdfFontSize}px Verdana, sans-serif`;
+                        ctx.font = `bold ${pdfFontSize}px "Bank Gothic", "BankGothic", "Arial Narrow", Arial, sans-serif`;
                         ctx.fillStyle = '#000000';
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'top'; // Changed from 'alphabetic' to 'top' for more predictable positioning
@@ -2015,10 +2016,64 @@
 
         // Gallery drag and drop removed per application.mdc - 2-section layout only
 
+        // Detect which font is actually available on the system
+        function detectAvailableFont() {
+            const fontList = [
+                { name: 'Bank Gothic', display: 'Bank Gothic Bold' },
+                { name: 'BankGothic', display: 'BankGothic Bold' },
+                { name: 'Arial Narrow', display: 'Arial Narrow Bold' },
+                { name: 'Arial', display: 'Arial Bold' }
+            ];
+            const testString = 'abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            const testSize = 72;
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Measure with fallback font (monospace)
+            ctx.font = `bold ${testSize}px monospace`;
+            const fallbackWidth = ctx.measureText(testString).width;
+            
+            // Test each font in the list (using bold weight)
+            for (const font of fontList) {
+                ctx.font = `bold ${testSize}px "${font.name}", monospace`;
+                const testWidth = ctx.measureText(testString).width;
+                
+                // If width differs, the font is available
+                if (Math.abs(testWidth - fallbackWidth) > 1) {
+                    return font.display;
+                }
+            }
+            
+            // If no font matched, return the last fallback
+            return 'Arial Bold (fallback)';
+        }
+
+        // Update font status in the UI
+        function updateFontStatus() {
+            const detectedFont = detectAvailableFont();
+            const fontStatusElement = document.getElementById('detectedFont');
+            
+            if (fontStatusElement) {
+                fontStatusElement.textContent = detectedFont;
+                
+                // Color code based on font quality
+                if (detectedFont.includes('Bank Gothic') || detectedFont.includes('BankGothic')) {
+                    fontStatusElement.className = 'font-semibold text-green-600';
+                } else if (detectedFont.includes('Arial Narrow')) {
+                    fontStatusElement.className = 'font-semibold text-yellow-600';
+                } else {
+                    fontStatusElement.className = 'font-semibold text-orange-600';
+                }
+            }
+            
+            console.log('Detected font for ship names:', detectedFont);
+        }
+
         // Initialize
         window.onload = () => {
             initA4Dimensions();
             updateUI();
+            updateFontStatus();
         };
 
         // Event listeners
@@ -2051,7 +2106,7 @@
             const lastUpdatedElement = document.getElementById('lastUpdated');
             if (lastUpdatedElement) {
                 // Fixed date when the application was last updated
-                const lastUpdatedDate = '2025-09-14 20:30';
+                const lastUpdatedDate = '2025-11-16 14:30';
                 lastUpdatedElement.textContent = lastUpdatedDate;
             }
         }
