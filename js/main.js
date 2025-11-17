@@ -1,72 +1,7 @@
-        // A4 dimensions in mm (horizontal/landscape mode)
-        const A4_WIDTH_MM = 297;  // Landscape width
-        const A4_HEIGHT_MM = 210; // Landscape height
-        const DPI = 96;
-        
-        // Card dimensions in mm
-        const CARD_WIDTH_MM = 63.5;
-        const CARD_HEIGHT_MM = 88;
-        
-        // Card type definitions
-        const CARD_TYPES = {
-            'standard': {
-                name: 'Standard Card',
-                width: 63.5,
-                height: 88,
-                description: '63.5mm × 88mm (vertical) or 88mm × 63.5mm (horizontal)'
-            },
-            'small-ship': {
-                name: 'Small Ship (X-Wing)',
-                width: 32,
-                height: 38,
-                description: '32mm × 38mm'
-            },
-            'medium-ship': {
-                name: 'Medium Ship (X-Wing)',
-                width: 54,
-                height: 61,
-                description: '54mm × 61mm'
-            },
-            'large-ship': {
-                name: 'Large Ship (X-Wing)',
-                width: 73,
-                height: 80,
-                description: '73mm × 80mm'
-            },
-            'inner-dial': {
-                name: 'Inner Dial (X-Wing)',
-                width: 43,
-                height: 43,
-                description: '43mm diameter (round)'
-            },
-            'front-dial': {
-                name: 'Front Dial (X-Wing)',
-                width: 50,
-                height: 50,
-                description: '50mm diameter (round)'
-            },
-            'huge-ship': {
-                name: 'Huge Ship (X-Wing)',
-                width: 80.5,
-                height: 224,
-                description: '80.5mm × 224mm'
-            }
-        };
-        
-        // Base tile size mapping to existing card types
-        // Maps size keywords to card types, using full dimensions (width × height)
-        const BASE_TILE_SIZE_MAP = {
-            'small': 'small-ship',    // 32mm × 38mm
-            'medium': 'medium-ship',  // 54mm × 61mm
-            'large': 'large-ship',     // 73mm × 80mm
-            'huge': 'huge-ship'       // 80.5 x 224mm
-        };
-        
+        // Configuration is now loaded from config.js
+
         // Default card type
         let selectedCardType = 'custom';
-        
-        // Grid snapping settings
-        const GRID_SIZE = 10; // Grid size in pixels for snapping
 
         // Convert mm to pixels
         function mmToPixels(mm) {
@@ -382,7 +317,7 @@
 
         // Find the best auto-placement position for a new image
         function findBestAutoPlacementPosition(image) {
-            const padding = GRID_SIZE; // Minimum padding between cards and canvas edges
+            const padding = AUTO_PLACEMENT_PADDING; // Minimum padding between cards and canvas edges
             
             // If canvas is empty, place at top-left with padding
             if (images.length === 0) {
@@ -391,7 +326,7 @@
             }
             
             // Try to place in a grid layout (left-to-right, top-to-bottom)
-            const gridStep = GRID_SIZE * 2;
+            const gridStep = GRID_SIZE * AUTO_PLACEMENT_GRID_STEP;
             for (let y = padding; y < a4Dimensions.height - image.height; y += gridStep) {
                 for (let x = padding; x < a4Dimensions.width - image.width; x += gridStep) {
                     const snapped = snapToGrid(x, y);
@@ -411,7 +346,7 @@
         // Find nearest valid position
         function findNearestValidPosition(image, targetX, targetY) {
             const step = GRID_SIZE; // Use grid size as step size
-            const maxAttempts = 50;
+            const maxAttempts = COLLISION_SEARCH_MAX_ATTEMPTS;
             
             // Snap target position to grid
             const snappedTarget = snapToGrid(targetX, targetY);
@@ -451,7 +386,7 @@
             }
             
             // If no valid position found, try a systematic grid search starting from top-left
-            const gridStep = GRID_SIZE * 2;
+            const gridStep = GRID_SIZE * AUTO_PLACEMENT_GRID_STEP;
             for (let y = 0; y < a4Dimensions.height - image.height; y += gridStep) {
                 for (let x = 0; x < a4Dimensions.width - image.width; x += gridStep) {
                     const snapped = snapToGrid(x, y);
@@ -490,8 +425,8 @@
         // Initialize A4 dimensions
         function initA4Dimensions() {
             // Get available space for A4 layout (70% of screen width, full height minus padding)
-            const containerWidth = window.innerWidth * 0.7 - 32; // 70% minus minimal padding
-            const containerHeight = window.innerHeight - 32 - 100; // Full height minus minimal padding and 20px bottom padding
+            const containerWidth = window.innerWidth * A4_LAYOUT_WIDTH - LAYOUT_PADDING; // 70% minus minimal padding
+            const containerHeight = window.innerHeight - LAYOUT_PADDING - BOTTOM_PADDING; // Full height minus minimal padding and bottom padding
             
             // A4 dimensions in pixels (horizontal: 297mm x 210mm)
             const baseWidth = mmToPixels(A4_WIDTH_MM);  // 297mm
@@ -580,8 +515,8 @@
             // Clone button
             const cloneBtn = document.createElement('button');
             cloneBtn.className = 'clone-btn control-bottom-right';
-            cloneBtn.style.bottom = controlPositions.remove.bottom;
-            cloneBtn.style.right = (parseInt(controlPositions.remove.right) + 32) + 'px'; // Position to the left of remove button
+            cloneBtn.style.bottom = CONTROL_OFFSET + 'px';
+            cloneBtn.style.right = (CONTROL_OFFSET + 32) + 'px'; // Position to the left of remove button
             cloneBtn.innerHTML = '⧉'; // Clone symbol
             cloneBtn.title = 'Clone image';
             cloneBtn.onclick = (e) => {
@@ -596,8 +531,8 @@
 
             const removeBtn = document.createElement('button');
             removeBtn.className = 'remove-btn control-bottom-right';
-            removeBtn.style.bottom = controlPositions.remove.bottom;
-            removeBtn.style.right = controlPositions.remove.right;
+            removeBtn.style.bottom = CONTROL_OFFSET + 'px';
+            removeBtn.style.right = CONTROL_OFFSET + 'px';
             removeBtn.innerHTML = '×';
             removeBtn.onclick = (e) => {
                 e.preventDefault();
@@ -616,8 +551,8 @@
             if (image.cardType !== 'inner-dial' && image.cardType !== 'front-dial') {
                 rotationIndicator = document.createElement('div');
                 rotationIndicator.className = 'control-top-left bg-blue-500 text-white text-xs px-1 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:bg-blue-600 select-none';
-                rotationIndicator.style.top = controlPositions.rotate.top;
-                rotationIndicator.style.left = controlPositions.rotate.left;
+                rotationIndicator.style.top = CONTROL_OFFSET + 'px';
+                rotationIndicator.style.left = CONTROL_OFFSET + 'px';
             rotationIndicator.textContent = image.isRotated ? '↻' : '↻';
                 rotationIndicator.title = image.isRotated ? 'Click to rotate back (88×63.5mm)' : 'Click to rotate (63.5×88mm)';
                 rotationIndicator.onclick = (e) => {
@@ -635,8 +570,8 @@
             // Add card type selector
             const cardTypeSelect = document.createElement('select');
             cardTypeSelect.className = 'control-bottom-left card-type-select bg-white text-gray-700 text-xs px-1 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:bg-gray-100 select-none border';
-            cardTypeSelect.style.bottom = controlPositions.cardType.bottom;
-            cardTypeSelect.style.left = controlPositions.cardType.left;
+            cardTypeSelect.style.bottom = CONTROL_OFFSET + 'px';
+            cardTypeSelect.style.left = CONTROL_OFFSET + 'px';
             cardTypeSelect.style.fontSize = '10px';
             cardTypeSelect.style.padding = '2px';
             cardTypeSelect.title = 'Change card type';
@@ -673,9 +608,9 @@
                 shipNameInput.value = image.shipName || '';
                 shipNameInput.title = 'Enter ship name (up to 2 lines)';
                 shipNameInput.rows = 1;
-                
-                // Position 35.5mm from the top of the image for screen display
-                const topOffsetMm = 35.5;
+
+                // Position from the top of the image for screen display
+                const topOffsetMm = SHIP_NAME_TOP_OFFSET_SCREEN_MM;
                 const topOffsetPx = mmToPixels(topOffsetMm) * a4Dimensions.scale;
                 
                 // Function to update text box position
@@ -1096,8 +1031,8 @@
             const clonedImage = {
                 ...originalImage,
                 id: Math.random().toString(36).substr(2, 9),
-                x: originalImage.x + 20, // Offset by 20px to the right
-                y: originalImage.y + 20  // Offset by 20px down
+                x: originalImage.x + CLONE_OFFSET_X, // Offset to the right
+                y: originalImage.y + CLONE_OFFSET_Y  // Offset down
             };
 
             // Ensure the clone stays within A4 bounds
@@ -1123,20 +1058,21 @@
 
         // Get control positions - absolute positioning regardless of rotation
         function getControlPositions(isRotated = false) {
+            const offsetPx = CONTROL_OFFSET + 'px';
             if (isRotated) {
                 // When container is rotated 90°, we need to adjust positions
                 // The "bottom-left" of a rotated container is actually the "left-bottom" of the original
                 return {
-                    rotate: { top: '4px', left: '4px' },           // Top-left: rotate button (stays same)
-                    cardType: { bottom: '4px', left: '4px' },       // Bottom-left: card type selector (stays same)
-                    remove: { bottom: '4px', right: '4px' }         // Bottom-right: remove button (stays same)
+                    rotate: { top: offsetPx, left: offsetPx },           // Top-left: rotate button (stays same)
+                    cardType: { bottom: offsetPx, left: offsetPx },       // Bottom-left: card type selector (stays same)
+                    remove: { bottom: offsetPx, right: offsetPx }         // Bottom-right: remove button (stays same)
                 };
             } else {
                 // Normal orientation
                 return {
-                    rotate: { top: '4px', left: '4px' },           // Top-left: rotate button
-                    cardType: { bottom: '4px', left: '4px' },       // Bottom-left: card type selector
-                    remove: { bottom: '4px', right: '4px' }         // Bottom-right: remove button
+                    rotate: { top: offsetPx, left: offsetPx },           // Top-left: rotate button
+                    cardType: { bottom: offsetPx, left: offsetPx },       // Bottom-left: card type selector
+                    remove: { bottom: offsetPx, right: offsetPx }         // Bottom-right: remove button
                 };
             }
         }
@@ -1241,9 +1177,9 @@
                         shipNameInput.value = image.shipName || '';
                         shipNameInput.title = 'Enter ship name (up to 2 lines)';
                         shipNameInput.rows = 1;
-                        
-                        // Position 35.5mm from the top of the image for screen display
-                        const topOffsetMm = 35.5;
+
+                        // Position from the top of the image for screen display
+                        const topOffsetMm = SHIP_NAME_TOP_OFFSET_SCREEN_MM;
                         const topOffsetPx = mmToPixels(topOffsetMm) * a4Dimensions.scale;
                         
                         // Function to update text box position
@@ -1284,9 +1220,9 @@
                         // Update existing ship name input value and position
                         existingShipNameInput.value = image.shipName || '';
                         image.shipName = image.shipName || '';
-                        
-                        // Recalculate position for existing text box (35.5mm for screen display)
-                        const topOffsetMm = 35.5;
+
+                        // Recalculate position for existing text box (for screen display)
+                        const topOffsetMm = SHIP_NAME_TOP_OFFSET_SCREEN_MM;
                         const topOffsetPx = mmToPixels(topOffsetMm) * a4Dimensions.scale;
                         
                         const topPosition = topOffsetPx;
@@ -1670,16 +1606,15 @@
                         const canvas = document.createElement('canvas');
                         const ctx = canvas.getContext('2d');
 
-                        // Set font properties (35% smaller for PDF)
-                        const pdfFontSize = 7.8; // 12px * 0.65 = 7.8px (35% smaller)
-                        const lineHeight = 9.36; // 7.8px * 1.2 line-height
-                        
-                        // Set font for measurement (Bank Gothic Bold)
-                        ctx.font = `bold ${pdfFontSize}px "Bank Gothic", "BankGothic", "Arial Narrow", Arial, sans-serif`;
-                        
-                        // Max width based on textarea max-width (158px on screen at 12px font)
-                        // For PDF at 7.8px font, proportionally: 158 * (7.8 / 12) = 102.7px
-                        const maxLineWidth = 102.7;
+                        // Set font properties
+                        const pdfFontSize = SHIP_NAME_FONT_SIZE_PDF;
+                        const lineHeight = pdfFontSize * SHIP_NAME_LINE_HEIGHT_MULTIPLIER;
+
+                        // Set font for measurement
+                        ctx.font = `bold ${pdfFontSize}px ${SHIP_NAME_FONT_FAMILY}`;
+
+                        // Max width for PDF
+                        const maxLineWidth = SHIP_NAME_MAX_WIDTH_PDF;
                         
                         // Split text by explicit newlines first (preserve case for Bank Gothic small caps)
                         const explicitLines = image.shipName.trim().split(/\r?\n/);
@@ -1723,7 +1658,7 @@
                         const textHeight = lines.length * lineHeight;
 
                         // Set canvas size with higher resolution for crisp text
-                        const scale = 2;
+                        const scale = TEXT_CANVAS_SCALE;
                         canvas.width = Math.ceil((maxWidth + 10) * scale);
                         canvas.height = Math.ceil(textHeight * scale);
 
@@ -1731,7 +1666,7 @@
                         ctx.scale(scale, scale);
 
                         // Set font properties again after scaling
-                        ctx.font = `bold ${pdfFontSize}px "Bank Gothic", "BankGothic", "Arial Narrow", Arial, sans-serif`;
+                        ctx.font = `bold ${pdfFontSize}px ${SHIP_NAME_FONT_FAMILY}`;
                         ctx.fillStyle = '#000000';
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'top'; // Changed from 'alphabetic' to 'top' for more predictable positioning
@@ -1760,7 +1695,7 @@
                         const textWidthMm = actualWidth * 0.264583;
                         const textHeightMm = actualHeight * 0.264583;
                         const textX = constrainedX + (constrainedWidth / 2) - (textWidthMm / 2);
-                        const textY = constrainedY + 34; // 34mm from top
+                        const textY = constrainedY + SHIP_NAME_TOP_OFFSET_PDF_MM; // Position from top
 
                         const textXPoints = mmToPoints(textX);
                         const textYPoints = mmToPoints(textY);
@@ -1947,9 +1882,7 @@
         function setLastUpdated() {
             const lastUpdatedElement = document.getElementById('lastUpdated');
             if (lastUpdatedElement) {
-                // Fixed date when the application was last updated
-                const lastUpdatedDate = '2025-11-16 14:30';
-                lastUpdatedElement.textContent = lastUpdatedDate;
+                lastUpdatedElement.textContent = LAST_UPDATED_DATE;
             }
         }
 
