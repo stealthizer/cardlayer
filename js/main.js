@@ -672,6 +672,10 @@
         clearAllBtn.onclick = clearAllImages;
         addPageBtn.onclick = addNewPage;
 
+        // PDF Preview modal event listeners
+        document.getElementById('exportPdfBtn').onclick = exportPDF;
+        document.getElementById('cancelPreviewBtn').onclick = closePreviewModal;
+
         // Drag and drop for A4 canvas
         a4Canvas.ondragover = (e) => {
             e.preventDefault();

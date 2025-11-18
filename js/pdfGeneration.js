@@ -1,7 +1,115 @@
 // PDF Generation module for Cardlayer
 
-// Generate PDF from positioned images (supports multiple pages)
-async function generatePDF(pagesData, a4Dimensions, pixelsToMm) {
+// Store PDF document for later export
+let currentPdfDoc = null;
+let currentFilename = 'cardlayer-export';
+
+// Generate PDF preview and show modal
+async function showPDFPreview(pagesData, a4Dimensions, pixelsToMm) {
+    // Generate the PDF document
+    const pdfDoc = await createPDFDocument(pagesData, a4Dimensions, pixelsToMm);
+
+    if (!pdfDoc) return;
+
+    // Store for later export
+    currentPdfDoc = pdfDoc;
+
+    // Render preview images
+    await renderPDFPreview(pdfDoc);
+
+    // Show modal
+    const modal = document.getElementById('pdfPreviewModal');
+    modal.style.display = 'flex';
+}
+
+// Render PDF pages as preview images using an iframe with embedded PDF
+async function renderPDFPreview(pdfDoc) {
+    const previewContent = document.getElementById('pdfPreviewContent');
+    previewContent.innerHTML = '<div class="text-center text-gray-600">Generating preview...</div>';
+
+    // Save PDF to bytes
+    const pdfBytes = await pdfDoc.save();
+    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    const pdfUrl = URL.createObjectURL(blob);
+
+    // Clear loading message
+    previewContent.innerHTML = '';
+
+    const pages = pdfDoc.getPages();
+
+    // Create preview container for each page
+    for (let i = 0; i < pages.length; i++) {
+        const pageContainer = document.createElement('div');
+        pageContainer.className = 'bg-white rounded-lg shadow-lg p-4';
+
+        const pageLabel = document.createElement('div');
+        pageLabel.className = 'text-sm font-medium text-gray-700 mb-2';
+        pageLabel.textContent = `Page ${i + 1} of ${pages.length}`;
+
+        // Create an iframe to show the PDF page
+        const iframe = document.createElement('iframe');
+        iframe.src = `${pdfUrl}#page=${i + 1}&toolbar=0&navpanes=0&scrollbar=0&view=FitH`;
+        iframe.className = 'w-full border-2 border-gray-300 rounded';
+        iframe.style.height = '600px';
+        iframe.style.backgroundColor = 'white';
+
+        pageContainer.appendChild(pageLabel);
+        pageContainer.appendChild(iframe);
+        previewContent.appendChild(pageContainer);
+    }
+
+    // Store URL for cleanup
+    previewContent.dataset.pdfUrl = pdfUrl;
+}
+
+// Export the PDF with custom filename
+async function exportPDF() {
+    if (!currentPdfDoc) return;
+
+    // Get filename from input
+    const filenameInput = document.getElementById('pdfFilename');
+    let filename = filenameInput.value.trim();
+
+    if (!filename) {
+        filename = 'cardlayer-export';
+    }
+
+    // Ensure .pdf extension
+    if (!filename.endsWith('.pdf')) {
+        filename += '.pdf';
+    }
+
+    // Save PDF
+    const pdfBytes = await currentPdfDoc.save();
+    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+
+    // Close modal
+    closePreviewModal();
+}
+
+// Close preview modal
+function closePreviewModal() {
+    const modal = document.getElementById('pdfPreviewModal');
+    modal.style.display = 'none';
+
+    // Clean up PDF URL
+    const previewContent = document.getElementById('pdfPreviewContent');
+    if (previewContent.dataset.pdfUrl) {
+        URL.revokeObjectURL(previewContent.dataset.pdfUrl);
+        delete previewContent.dataset.pdfUrl;
+    }
+
+    currentPdfDoc = null;
+}
+
+// Create PDF document (extracted from original generatePDF)
+async function createPDFDocument(pagesData, a4Dimensions, pixelsToMm) {
     // pagesData can be either an array of page objects (new format) or an array of images (legacy format)
     const isLegacyFormat = pagesData.length > 0 && !pagesData[0].hasOwnProperty('images');
 
@@ -16,7 +124,7 @@ async function generatePDF(pagesData, a4Dimensions, pixelsToMm) {
 
     // Check if there are any images across all pages
     const totalImages = allPages.reduce((sum, page) => sum + page.images.length, 0);
-    if (totalImages === 0) return;
+    if (totalImages === 0) return null;
 
     const { PDFDocument, rgb, degrees } = PDFLib;
 
@@ -117,17 +225,13 @@ async function generatePDF(pagesData, a4Dimensions, pixelsToMm) {
         }
     }
 
-    // Serialize the PDF document to bytes
-    const pdfBytes = await pdfDoc.save();
+    // Return the PDF document (don't download yet)
+    return pdfDoc;
+}
 
-    // Create a blob and download
-    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'cardlayer-export.pdf';
-    link.click();
-    URL.revokeObjectURL(url);
+// Legacy function for backward compatibility - now shows preview first
+async function generatePDF(pagesData, a4Dimensions, pixelsToMm) {
+    await showPDFPreview(pagesData, a4Dimensions, pixelsToMm);
 }
 
 // Add ship name text to front dial
