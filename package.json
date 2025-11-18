@@ -1,0 +1,22 @@
+{
+  "name": "cardlayer",
+  "version": "1.0.0",
+  "description": "A4 Trading Card Layout Tool",
+  "type": "module",
+  "scripts": {
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage",
+    "test:run": "vitest run"
+  },
+  "keywords": ["card", "layout", "a4", "pdf", "printing"],
+  "author": "Stealthizer",
+  "license": "MIT",
+  "devDependencies": {
+    "@vitest/ui": "^2.1.8",
+    "@vitest/coverage-v8": "^2.1.8",
+    "canvas": "^2.11.2",
+    "happy-dom": "^15.11.7",
+    "vitest": "^2.1.8"
+  }
+}
