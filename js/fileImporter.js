@@ -3,7 +3,6 @@
 
 // Process dropped files and convert them to image objects
 async function processFiles(files, {
-    selectedCardType,
     images,
     a4Dimensions,
     addImageToCanvas,
@@ -30,7 +29,8 @@ async function processFiles(files, {
 
                     // Auto-detect card type and orientation from filename
                     // Only matches if filename begins with the keyword (prevents false positives)
-                    let detectedCardType = selectedCardType;
+                    // Default to 'custom' for all non-autodetected cards
+                    let detectedCardType = 'custom';
                     let forceOrientation = null; // null = auto-detect, false = vertical, true = horizontal
                     let baseTileSize = null; // null or one of: 'small', 'medium', 'large', 'huge'
                     let applyInnerDialTreatment = false; // Flag to apply circular cropping for "dial -" files

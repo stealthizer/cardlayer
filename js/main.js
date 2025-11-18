@@ -1,8 +1,7 @@
         // Configuration is now loaded from config.js
         // Image processing functions are now in imageProcessing.js
 
-        // Default card type
-        let selectedCardType = 'custom';
+        // All non-autodetected cards will be treated as 'custom'
 
         // Global state for multiple pages
         let pages = [{ id: 1, images: [] }]; // Array of pages, each with its own images
@@ -182,38 +181,6 @@
                 };
             }
 
-            // Add card type selector
-            const cardTypeSelect = document.createElement('select');
-            cardTypeSelect.className = 'control-bottom-left card-type-select bg-white text-gray-700 text-xs px-1 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:bg-gray-100 select-none border';
-            cardTypeSelect.style.bottom = CONTROL_OFFSET + 'px';
-            cardTypeSelect.style.left = CONTROL_OFFSET + 'px';
-            cardTypeSelect.style.fontSize = '10px';
-            cardTypeSelect.style.padding = '2px';
-            cardTypeSelect.title = 'Change card type';
-            
-            // Add options
-            Object.keys(CARD_TYPES).forEach(type => {
-                const option = document.createElement('option');
-                option.value = type;
-                option.textContent = CARD_TYPES[type].name;
-                if (type === image.cardType) {
-                    option.selected = true;
-                }
-                cardTypeSelect.appendChild(option);
-            });
-            
-            cardTypeSelect.onchange = (e) => {
-                e.stopPropagation();
-                console.log('Card type selector changed for image', image.id, 'to', e.target.value);
-                changeCardType(image.id, e.target.value);
-            };
-            cardTypeSelect.onmousedown = (e) => {
-                e.stopPropagation();
-            };
-            cardTypeSelect.onclick = (e) => {
-                e.stopPropagation();
-            };
-
             // Add ship name input field (only for front dials)
             let shipNameInput = null;
             if (image.cardType === 'front-dial') {
@@ -268,7 +235,6 @@
             if (rotationIndicator) {
             container.appendChild(rotationIndicator);
             }
-            container.appendChild(cardTypeSelect);
             if (shipNameInput) {
                 container.appendChild(shipNameInput);
             }
@@ -277,8 +243,7 @@
             container.onmousedown = (e) => {
                 // Don't start drag if clicking on controls
                 if (e.target.classList.contains('clone-btn') ||
-                    e.target.classList.contains('remove-btn') || 
-                    e.target.classList.contains('card-type-select') ||
+                    e.target.classList.contains('remove-btn') ||
                     e.target.classList.contains('ship-name-input') ||
                     e.target.tagName === 'SELECT' ||
                     e.target.tagName === 'OPTION' ||
@@ -639,195 +604,17 @@
             const offsetPx = CONTROL_OFFSET + 'px';
             if (isRotated) {
                 // When container is rotated 90°, we need to adjust positions
-                // The "bottom-left" of a rotated container is actually the "left-bottom" of the original
                 return {
-                    rotate: { top: offsetPx, left: offsetPx },           // Top-left: rotate button (stays same)
-                    cardType: { bottom: offsetPx, left: offsetPx },       // Bottom-left: card type selector (stays same)
-                    remove: { bottom: offsetPx, right: offsetPx }         // Bottom-right: remove button (stays same)
+                    rotate: { top: offsetPx, left: offsetPx },           // Top-left: rotate button
+                    remove: { bottom: offsetPx, right: offsetPx }         // Bottom-right: remove button
                 };
             } else {
                 // Normal orientation
                 return {
                     rotate: { top: offsetPx, left: offsetPx },           // Top-left: rotate button
-                    cardType: { bottom: offsetPx, left: offsetPx },       // Bottom-left: card type selector
                     remove: { bottom: offsetPx, right: offsetPx }         // Bottom-right: remove button
                 };
             }
-        }
-
-        // Change card type of an existing image
-        function changeCardType(imageId, newCardType) {
-            const currentImages = getCurrentImages();
-            const image = currentImages.find(img => img.id === imageId);
-            if (!image) return;
-
-            console.log('Changing card type for image', imageId, 'from', image.cardType, 'to', newCardType);
-
-            // Calculate new dimensions with the new card type
-            const cardDims = calculateCardDimensions(image.originalWidth, image.originalHeight, newCardType);
-            
-            // Update image properties
-            image.cardType = newCardType;
-            image.cardWidthMm = cardDims.cardWidthMm;
-            image.cardHeightMm = cardDims.cardHeightMm;
-            image.isRotated = cardDims.isRotated;
-            
-            // Handle ship name property
-            if (newCardType === 'front-dial') {
-                image.shipName = image.shipName || ''; // Initialize if changing to front dial
-            } else {
-                image.shipName = undefined; // Remove ship name for non-front dial types
-            }
-            
-            // Recalculate scaled dimensions
-            const cardWidthScaled = cardDims.width * a4Dimensions.scale;
-            const cardHeightScaled = cardDims.height * a4Dimensions.scale;
-            
-            // Update dimensions
-            image.width = cardWidthScaled;
-            image.height = cardHeightScaled;
-            
-            // Constrain to A4 bounds
-            image.x = Math.max(0, Math.min(image.x, a4Dimensions.width - image.width));
-            image.y = Math.max(0, Math.min(image.y, a4Dimensions.height - image.height));
-            
-            // Update DOM element
-            const element = document.querySelector(`[data-image-id="${imageId}"]`);
-            if (element) {
-                element.style.width = image.width + 'px';
-                element.style.height = image.height + 'px';
-                element.style.left = image.x + 'px';
-                element.style.top = image.y + 'px';
-
-                // Update image element
-                const imgElement = element.querySelector('img');
-                if (imgElement) {
-                    // Use rotated source if available
-                    imgElement.src = image.isRotated && image.rotatedSrc ? image.rotatedSrc : image.src;
-
-                    // For dials, use contain to ensure the full circular image is visible
-                    if (image.cardType === 'inner-dial' || image.cardType === 'front-dial') {
-                        imgElement.style.objectFit = 'contain';
-                    } else {
-                        imgElement.style.objectFit = 'cover';
-                    }
-                }
-                
-                // Update control positions
-                const controlPositions = getControlPositions(image.isRotated);
-                
-                // Update remove button position
-                const removeBtn = element.querySelector('.remove-btn');
-                if (removeBtn) {
-                    removeBtn.style.bottom = controlPositions.remove.bottom;
-                    removeBtn.style.right = controlPositions.remove.right;
-                }
-                
-                // Update rotation indicator position (only for non-dial cards)
-                if (image.cardType !== 'inner-dial' && image.cardType !== 'front-dial') {
-                    const rotationIndicator = element.querySelector('.control-top-left');
-                    if (rotationIndicator) {
-                        rotationIndicator.style.top = controlPositions.rotate.top;
-                        rotationIndicator.style.left = controlPositions.rotate.left;
-                    }
-                } else {
-                    // Remove rotation indicator for dials
-                    const rotationIndicator = element.querySelector('.control-top-left');
-                    if (rotationIndicator) {
-                        rotationIndicator.remove();
-                    }
-                }
-                
-                // Update card type selector position
-                const cardTypeSelect = element.querySelector('.card-type-select');
-                if (cardTypeSelect) {
-                    cardTypeSelect.style.bottom = controlPositions.cardType.bottom;
-                    cardTypeSelect.style.left = controlPositions.cardType.left;
-                }
-                
-                // Handle ship name input
-                const existingShipNameInput = element.querySelector('.ship-name-input');
-                if (image.cardType === 'front-dial') {
-                    if (!existingShipNameInput) {
-                        // Create new ship name input
-                        const shipNameInput = document.createElement('textarea');
-                        shipNameInput.className = 'ship-name-input';
-                        shipNameInput.placeholder = 'Ship Name';
-                        shipNameInput.value = image.shipName || '';
-                        shipNameInput.title = 'Enter ship name (up to 2 lines)';
-                        shipNameInput.rows = 1;
-
-                        // Position from the top of the image for screen display
-                        const topOffsetMm = SHIP_NAME_TOP_OFFSET_SCREEN_MM;
-                        const topOffsetPx = mmToPixels(topOffsetMm) * a4Dimensions.scale;
-                        
-                        // Function to update text box position
-                        const updateTextBoxPosition = (textarea) => {
-                            const topPosition = topOffsetPx;
-                            textarea.style.top = topPosition + 'px';
-                        };
-                        
-                        shipNameInput.style.left = '50%';
-                        shipNameInput.style.transform = 'translateX(-50%)';
-                        
-                        // Handle input changes
-                        shipNameInput.oninput = (e) => {
-                            e.stopPropagation();
-                            image.shipName = e.target.value;
-                            console.log('Ship name changed for image', image.id, 'to', e.target.value);
-                            
-                            // Auto-resize textarea
-                            e.target.style.height = 'auto';
-                            e.target.style.height = Math.min(e.target.scrollHeight, 32) + 'px';
-                            // Update position after resize
-                            updateTextBoxPosition(e.target);
-                        };
-                        
-                        // Initial position setup
-                        updateTextBoxPosition(shipNameInput);
-                        
-                        shipNameInput.onmousedown = (e) => {
-                            e.stopPropagation();
-                        };
-                        
-                        shipNameInput.onclick = (e) => {
-                            e.stopPropagation();
-                        };
-                        
-                        element.appendChild(shipNameInput);
-                    } else {
-                        // Update existing ship name input value and position
-                        existingShipNameInput.value = image.shipName || '';
-                        image.shipName = image.shipName || '';
-
-                        // Recalculate position for existing text box (for screen display)
-                        const topOffsetMm = SHIP_NAME_TOP_OFFSET_SCREEN_MM;
-                        const topOffsetPx = mmToPixels(topOffsetMm) * a4Dimensions.scale;
-                        
-                        const topPosition = topOffsetPx;
-                        existingShipNameInput.style.top = topPosition + 'px';
-                        
-                        // Handle input changes for existing input
-                        existingShipNameInput.oninput = (e) => {
-                            e.stopPropagation();
-                            image.shipName = e.target.value;
-                            console.log('Ship name changed for image', image.id, 'to', e.target.value);
-                            
-                            // Auto-resize textarea
-                            e.target.style.height = 'auto';
-                            e.target.style.height = Math.min(e.target.scrollHeight, 32) + 'px';
-                            // Position remains at topOffsetPx (no dynamic centering)
-                        };
-                    }
-                } else {
-                    // Remove ship name input for non-front dial types
-                    if (existingShipNameInput) {
-                        existingShipNameInput.remove();
-                    }
-                }
-            }
-            
-            console.log('Card type changed successfully for image', imageId, 'to', newCardType);
         }
 
         // Clear all images
@@ -864,7 +651,6 @@
         // Process files wrapper - now uses external fileImporter module
         async function handleProcessFiles(files) {
             await processFiles(files, {
-                selectedCardType,
                 images: getCurrentImages(),
                 a4Dimensions,
                 addImageToCanvas,
@@ -972,11 +758,6 @@
             document.getElementById('fileInput').click();
         });
 
-        // Card type selector
-        document.getElementById('cardTypeSelect').addEventListener('change', (e) => {
-            selectedCardType = e.target.value;
-            console.log('Card type changed to:', selectedCardType);
-        });
 
         // Keyboard shortcuts for selected image
         document.addEventListener('keydown', (e) => {
