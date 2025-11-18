@@ -4,10 +4,22 @@
         // Default card type
         let selectedCardType = 'custom';
 
-        // Global state
-        let images = [];
+        // Global state for multiple pages
+        let pages = [{ id: 1, images: [] }]; // Array of pages, each with its own images
+        let currentPageIndex = 0; // Currently active page
+        let nextPageId = 2; // Counter for generating unique page IDs
         let a4Dimensions = { width: 0, height: 0, scale: 1 };
         let selectedImageId = null; // Track selected image for keyboard shortcuts
+
+        // Legacy compatibility - get current page images
+        function getCurrentImages() {
+            return pages[currentPageIndex].images;
+        }
+
+        // Legacy compatibility - set current page images
+        function setCurrentImages(newImages) {
+            pages[currentPageIndex].images = newImages;
+        }
 
         // DOM elements
         const fileInput = document.getElementById('fileInput');
@@ -19,6 +31,10 @@
         const a4Canvas = document.getElementById('a4Canvas');
         const dropOverlay = document.getElementById('dropOverlay');
         const a4EmptyState = document.getElementById('a4EmptyState');
+        const addPageBtn = document.getElementById('addPageBtn');
+        const pageList = document.getElementById('pageList');
+        const currentPageNumber = document.getElementById('currentPageNumber');
+        const totalPages = document.getElementById('totalPages');
         // Gallery elements removed per application.mdc - 2-section layout only
 
         // Initialize A4 dimensions
@@ -273,7 +289,7 @@
                 
                 e.preventDefault();
                 console.log('A4 image mousedown triggered', { imageId: image.id, clientX: e.clientX, clientY: e.clientY, target: e.target.className });
-                startDrag(image, e, images, a4Dimensions, a4Canvas);
+                startDrag(image, e, getCurrentImages(), a4Dimensions, a4Canvas);
             };
             
             console.log('A4 image element created with event handlers', {
@@ -347,7 +363,8 @@
 
         // Rotate image
         async function rotateImage(imageId) {
-            const image = images.find(img => img.id === imageId);
+            const currentImages = getCurrentImages();
+            const image = currentImages.find(img => img.id === imageId);
             if (!image) return;
 
             console.log('Rotating image', { imageId, wasRotated: image.isRotated });
@@ -440,9 +457,95 @@
 
         // Gallery functionality removed per application.mdc
 
+        // Page management functions
+        function addNewPage() {
+            const newPage = { id: nextPageId++, images: [] };
+            pages.push(newPage);
+            updatePageList();
+            switchToPage(pages.length - 1);
+        }
+
+        function switchToPage(pageIndex) {
+            if (pageIndex < 0 || pageIndex >= pages.length) return;
+
+            // Save current page state is already maintained in pages array
+            currentPageIndex = pageIndex;
+
+            // Clear canvas and redraw current page
+            a4Canvas.querySelectorAll('.image-container').forEach(el => el.remove());
+
+            const currentImages = getCurrentImages();
+            currentImages.forEach(image => {
+                addImageToCanvas(image);
+            });
+
+            // Update empty state
+            if (currentImages.length === 0) {
+                a4EmptyState.style.display = 'flex';
+            } else {
+                a4EmptyState.style.display = 'none';
+            }
+
+            updateUI();
+            updatePageList();
+        }
+
+        function deletePage(pageIndex) {
+            if (pages.length === 1) {
+                // Don't delete the last page, just clear it
+                pages[0].images = [];
+                switchToPage(0);
+                return;
+            }
+
+            pages.splice(pageIndex, 1);
+
+            // Adjust current page index if needed
+            if (currentPageIndex >= pages.length) {
+                currentPageIndex = pages.length - 1;
+            }
+
+            switchToPage(currentPageIndex);
+        }
+
+        function updatePageList() {
+            pageList.innerHTML = '';
+
+            pages.forEach((page, index) => {
+                const pageItem = document.createElement('div');
+                pageItem.className = `flex items-center justify-between p-2 rounded cursor-pointer transition-colors ${
+                    index === currentPageIndex ? 'bg-blue-100 border border-blue-300' : 'bg-white hover:bg-gray-100'
+                }`;
+
+                const pageInfo = document.createElement('div');
+                pageInfo.className = 'flex-1 text-sm';
+                pageInfo.textContent = `Page ${index + 1} (${page.images.length} cards)`;
+                pageInfo.onclick = () => switchToPage(index);
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'text-red-600 hover:text-red-800 text-xs px-2 py-1';
+                deleteBtn.textContent = '✕';
+                deleteBtn.title = 'Delete page';
+                deleteBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    if (pages.length > 1 || page.images.length === 0 || confirm('Delete this page and all its cards?')) {
+                        deletePage(index);
+                    }
+                };
+
+                pageItem.appendChild(pageInfo);
+                pageItem.appendChild(deleteBtn);
+                pageList.appendChild(pageItem);
+            });
+
+            currentPageNumber.textContent = currentPageIndex + 1;
+            totalPages.textContent = pages.length;
+        }
+
         // Remove image
         function removeImage(id) {
-            images = images.filter(img => img.id !== id);
+            const currentImages = getCurrentImages();
+            setCurrentImages(currentImages.filter(img => img.id !== id));
             const element = document.querySelector(`[data-image-id="${id}"]`);
             if (element) {
                 element.remove();
@@ -454,11 +557,12 @@
             }
 
             // Show empty state if no images
-            if (images.length === 0) {
+            if (getCurrentImages().length === 0) {
                 a4EmptyState.style.display = 'flex';
             }
 
             updateUI();
+            updatePageList();
         }
 
         // Select image for keyboard shortcuts
@@ -491,7 +595,8 @@
         }
 
         function cloneImage(id) {
-            const originalImage = images.find(img => img.id === id);
+            const currentImages = getCurrentImages();
+            const originalImage = currentImages.find(img => img.id === id);
             if (!originalImage) {
                 console.log('Original image not found for cloning');
                 return;
@@ -514,7 +619,7 @@
             console.log('Cloned image data:', clonedImage);
 
             // Add to images array
-            images.push(clonedImage);
+            currentImages.push(clonedImage);
 
             // Create and add the visual element to canvas
             const element = createImageElement(clonedImage);
@@ -524,8 +629,9 @@
             a4EmptyState.style.display = 'none';
 
             updateUI();
-            
-            console.log('Clone created, total images:', images.length);
+            updatePageList();
+
+            console.log('Clone created, total images:', getCurrentImages().length);
         }
 
         // Get control positions - absolute positioning regardless of rotation
@@ -551,7 +657,8 @@
 
         // Change card type of an existing image
         function changeCardType(imageId, newCardType) {
-            const image = images.find(img => img.id === imageId);
+            const currentImages = getCurrentImages();
+            const image = currentImages.find(img => img.id === imageId);
             if (!image) return;
 
             console.log('Changing card type for image', imageId, 'from', image.cardType, 'to', newCardType);
@@ -725,20 +832,31 @@
 
         // Clear all images
         function clearAllImages() {
-            images = [];
+            setCurrentImages([]);
             a4Canvas.querySelectorAll('.image-container').forEach(el => el.remove());
             a4EmptyState.style.display = 'flex';
             updateUI();
+            updatePageList();
         }
 
         // Update UI
         function updateUI() {
-            imageCount.textContent = images.length;
-            generatePdfBtn.disabled = images.length === 0;
-            clearAllBtn.style.display = images.length > 0 ? 'block' : 'none';
-            pdfStatus.textContent = images.length === 0 ? 'Add cards first' : `${images.length} card${images.length !== 1 ? 's' : ''} ready`;
-            
-            if (images.length === 0) {
+            const currentImages = getCurrentImages();
+            const totalCards = pages.reduce((sum, page) => sum + page.images.length, 0);
+
+            imageCount.textContent = totalCards;
+            generatePdfBtn.disabled = totalCards === 0;
+            clearAllBtn.style.display = currentImages.length > 0 ? 'block' : 'none';
+
+            if (totalCards === 0) {
+                pdfStatus.textContent = 'Add cards first';
+            } else if (pages.length === 1) {
+                pdfStatus.textContent = `${totalCards} card${totalCards !== 1 ? 's' : ''} ready`;
+            } else {
+                pdfStatus.textContent = `${totalCards} card${totalCards !== 1 ? 's' : ''} on ${pages.length} pages`;
+            }
+
+            if (currentImages.length === 0) {
                 a4EmptyState.style.display = 'flex';
             }
         }
@@ -747,22 +865,26 @@
         async function handleProcessFiles(files) {
             await processFiles(files, {
                 selectedCardType,
-                images,
+                images: getCurrentImages(),
                 a4Dimensions,
                 addImageToCanvas,
-                updateUI
+                updateUI: () => {
+                    updateUI();
+                    updatePageList();
+                }
             });
         }
 
-        // Generate PDF - now uses external module
+        // Generate PDF - now uses external module with multi-page support
         async function handleGeneratePDF() {
-            await generatePDF(images, a4Dimensions, pixelsToMm);
+            await generatePDF(pages, a4Dimensions, pixelsToMm);
         }
 
         // Event listeners
         fileInput.onchange = (e) => handleProcessFiles(e.target.files);
         generatePdfBtn.onclick = handleGeneratePDF;
         clearAllBtn.onclick = clearAllImages;
+        addPageBtn.onclick = addNewPage;
 
         // Drag and drop for A4 canvas
         a4Canvas.ondragover = (e) => {
@@ -842,6 +964,7 @@
             initA4Dimensions();
             updateUI();
             updateFontStatus();
+            updatePageList();
         };
 
         // Event listeners
@@ -867,7 +990,8 @@
                 return;
             }
 
-            const selectedImage = images.find(img => img.id === selectedImageId);
+            const currentImages = getCurrentImages();
+            const selectedImage = currentImages.find(img => img.id === selectedImageId);
             if (!selectedImage) {
                 return;
             }
@@ -897,8 +1021,9 @@
 
         window.onresize = () => {
             initA4Dimensions();
-            // Reposition all images
-            images.forEach(image => {
+            // Reposition all images on current page
+            const currentImages = getCurrentImages();
+            currentImages.forEach(image => {
                 const element = document.querySelector(`[data-image-id="${image.id}"]`);
                 if (element) {
                     element.style.left = image.x + 'px';

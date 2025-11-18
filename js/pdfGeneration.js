@@ -1,17 +1,27 @@
 // PDF Generation module for Cardlayer
 
-// Generate PDF from positioned images
-async function generatePDF(images, a4Dimensions, pixelsToMm) {
-    if (images.length === 0) return;
+// Generate PDF from positioned images (supports multiple pages)
+async function generatePDF(pagesData, a4Dimensions, pixelsToMm) {
+    // pagesData can be either an array of page objects (new format) or an array of images (legacy format)
+    const isLegacyFormat = pagesData.length > 0 && !pagesData[0].hasOwnProperty('images');
+
+    let allPages;
+    if (isLegacyFormat) {
+        // Legacy format: convert single images array to page format
+        allPages = [{ id: 1, images: pagesData }];
+    } else {
+        // New format: use pages directly
+        allPages = pagesData;
+    }
+
+    // Check if there are any images across all pages
+    const totalImages = allPages.reduce((sum, page) => sum + page.images.length, 0);
+    if (totalImages === 0) return;
 
     const { PDFDocument, rgb, degrees } = PDFLib;
 
     // Create a new PDF document
     const pdfDoc = await PDFDocument.create();
-
-    // Add an A4 page in landscape orientation
-    const page = pdfDoc.addPage([mmToPoints(A4_WIDTH_MM), mmToPoints(A4_HEIGHT_MM)]);
-    const { width: pageWidth, height: pageHeight } = page.getSize();
 
     // Helper function to convert mm to PDF points (1 point = 1/72 inch)
     function mmToPoints(mm) {
@@ -30,71 +40,80 @@ async function generatePDF(images, a4Dimensions, pixelsToMm) {
         }
     }
 
-    // Process images sequentially to handle async operations
-    for (const image of images) {
-        try {
-            // Calculate position in mm (converting from scaled pixels back to mm)
-            const xMm = pixelsToMm(image.x / a4Dimensions.scale);
-            const yMm = pixelsToMm(image.y / a4Dimensions.scale);
+    // Process each page
+    for (const pageData of allPages) {
+        // Add an A4 page in landscape orientation for each page
+        const page = pdfDoc.addPage([mmToPoints(A4_WIDTH_MM), mmToPoints(A4_HEIGHT_MM)]);
+        const { width: pageWidth, height: pageHeight } = page.getSize();
 
-            // Use the card dimensions directly (already in mm and correctly swapped if rotated)
-            const widthMm = image.cardWidthMm;
-            const heightMm = image.cardHeightMm;
+        const images = pageData.images;
 
-            // For dials, calculate proper dimensions based on image aspect ratio
-            let finalWidthMm = widthMm;
-            let finalHeightMm = heightMm;
+        // Process images sequentially to handle async operations
+        for (const image of images) {
+            try {
+                // Calculate position in mm (converting from scaled pixels back to mm)
+                const xMm = pixelsToMm(image.x / a4Dimensions.scale);
+                const yMm = pixelsToMm(image.y / a4Dimensions.scale);
 
-            if (image.cardType === 'inner-dial' || image.cardType === 'front-dial') {
-                // Calculate height based on the image's natural aspect ratio
-                const aspectRatio = image.originalWidth / image.originalHeight;
-                finalWidthMm = widthMm;
-                finalHeightMm = widthMm / aspectRatio;
+                // Use the card dimensions directly (already in mm and correctly swapped if rotated)
+                const widthMm = image.cardWidthMm;
+                const heightMm = image.cardHeightMm;
+
+                // For dials, calculate proper dimensions based on image aspect ratio
+                let finalWidthMm = widthMm;
+                let finalHeightMm = heightMm;
+
+                if (image.cardType === 'inner-dial' || image.cardType === 'front-dial') {
+                    // Calculate height based on the image's natural aspect ratio
+                    const aspectRatio = image.originalWidth / image.originalHeight;
+                    finalWidthMm = widthMm;
+                    finalHeightMm = widthMm / aspectRatio;
+                }
+
+                const constrainedX = Math.max(0, Math.min(xMm, A4_WIDTH_MM - finalWidthMm));
+                const constrainedY = Math.max(0, Math.min(yMm, A4_HEIGHT_MM - finalHeightMm));
+                const constrainedWidth = Math.min(finalWidthMm, A4_WIDTH_MM - constrainedX);
+                const constrainedHeight = Math.min(finalHeightMm, A4_HEIGHT_MM - constrainedY);
+
+                // Convert to PDF points
+                const xPoints = mmToPoints(constrainedX);
+                const yPoints = mmToPoints(constrainedY);
+                const widthPoints = mmToPoints(constrainedWidth);
+                const heightPoints = mmToPoints(constrainedHeight);
+
+                let imageToEmbed;
+
+                // Use pre-rotated source if available, otherwise use original
+                const imageSrc = image.isRotated && image.rotatedSrc ? image.rotatedSrc : image.src;
+                imageToEmbed = await loadImageFromDataUrl(imageSrc);
+
+                // PDF coordinates are from bottom-left, so we need to flip Y
+                const pdfY = pageHeight - yPoints - heightPoints;
+
+                // Draw the image on the page
+                page.drawImage(imageToEmbed, {
+                    x: xPoints,
+                    y: pdfY,
+                    width: widthPoints,
+                    height: heightPoints,
+                });
+
+                // Add ship name text for front dials using WYSIWYG approach
+                if (image.cardType === 'front-dial' && image.shipName && image.shipName.trim()) {
+                    await addShipNameText(
+                        image,
+                        page,
+                        pageHeight,
+                        constrainedX,
+                        constrainedY,
+                        constrainedWidth,
+                        mmToPoints,
+                        pdfDoc
+                    );
+                }
+            } catch (error) {
+                console.error(`Failed to add image ${image.name} to PDF:`, error);
             }
-
-            const constrainedX = Math.max(0, Math.min(xMm, A4_WIDTH_MM - finalWidthMm));
-            const constrainedY = Math.max(0, Math.min(yMm, A4_HEIGHT_MM - finalHeightMm));
-            const constrainedWidth = Math.min(finalWidthMm, A4_WIDTH_MM - constrainedX);
-            const constrainedHeight = Math.min(finalHeightMm, A4_HEIGHT_MM - constrainedY);
-
-            // Convert to PDF points
-            const xPoints = mmToPoints(constrainedX);
-            const yPoints = mmToPoints(constrainedY);
-            const widthPoints = mmToPoints(constrainedWidth);
-            const heightPoints = mmToPoints(constrainedHeight);
-
-            let imageToEmbed;
-
-            // Use pre-rotated source if available, otherwise use original
-            const imageSrc = image.isRotated && image.rotatedSrc ? image.rotatedSrc : image.src;
-            imageToEmbed = await loadImageFromDataUrl(imageSrc);
-
-            // PDF coordinates are from bottom-left, so we need to flip Y
-            const pdfY = pageHeight - yPoints - heightPoints;
-
-            // Draw the image on the page
-            page.drawImage(imageToEmbed, {
-                x: xPoints,
-                y: pdfY,
-                width: widthPoints,
-                height: heightPoints,
-            });
-
-            // Add ship name text for front dials using WYSIWYG approach
-            if (image.cardType === 'front-dial' && image.shipName && image.shipName.trim()) {
-                await addShipNameText(
-                    image,
-                    page,
-                    pageHeight,
-                    constrainedX,
-                    constrainedY,
-                    constrainedWidth,
-                    mmToPoints,
-                    pdfDoc
-                );
-            }
-        } catch (error) {
-            console.error(`Failed to add image ${image.name} to PDF:`, error);
         }
     }
 
