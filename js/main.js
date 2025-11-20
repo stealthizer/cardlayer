@@ -25,7 +25,6 @@
         const importBtn = document.getElementById('importBtn');
         const generatePdfBtn = document.getElementById('generatePdfBtn');
         const clearAllBtn = document.getElementById('clearAllBtn');
-        const imageCount = document.getElementById('imageCount');
         const pdfStatus = document.getElementById('pdfStatus');
         const a4Canvas = document.getElementById('a4Canvas');
         const dropOverlay = document.getElementById('dropOverlay');
@@ -650,7 +649,6 @@
             const currentImages = getCurrentImages();
             const totalCards = pages.reduce((sum, page) => sum + page.images.length, 0);
 
-            imageCount.textContent = totalCards;
             generatePdfBtn.disabled = totalCards === 0;
             clearAllBtn.style.display = currentImages.length > 0 ? 'block' : 'none';
 

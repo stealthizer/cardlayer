@@ -65,6 +65,13 @@ function deserializeProject(jsonString) {
  */
 function saveProjectToFile(pages, filename = 'cardlayer-project') {
     try {
+        // Check if there are any cards to save
+        const totalCards = pages.reduce((sum, page) => sum + page.images.length, 0);
+        if (totalCards === 0) {
+            alert('Cannot save an empty project. Please add at least one card first.');
+            return false;
+        }
+        
         const jsonString = serializeProject(pages);
         const blob = new Blob([jsonString], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -119,6 +126,15 @@ function loadProjectFromFile(file, callback) {
  */
 function saveProjectToLocalStorage(pages, key = 'cardlayer-autosave') {
     try {
+        // Check if there are any cards to save
+        const totalCards = pages.reduce((sum, page) => sum + page.images.length, 0);
+        if (totalCards === 0) {
+            console.log('Skipping autosave: no cards in project');
+            // Clear any existing autosave if project is now empty
+            clearAutosave(key);
+            return false;
+        }
+        
         const jsonString = serializeProject(pages);
         localStorage.setItem(key, jsonString);
         localStorage.setItem(key + '-timestamp', new Date().toISOString());
@@ -175,6 +191,12 @@ function checkAutosave(key = 'cardlayer-autosave') {
     try {
         const projectData = JSON.parse(jsonString);
         const totalImages = projectData.pages.reduce((sum, page) => sum + page.images.length, 0);
+        
+        // Don't return autosave info if there are no cards
+        if (totalImages === 0) {
+            console.log('Autosave found but has no cards, ignoring');
+            return null;
+        }
         
         return {
             timestamp: timestamp ? new Date(timestamp) : null,
