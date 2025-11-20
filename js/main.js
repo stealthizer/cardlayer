@@ -808,10 +808,11 @@
         // Detect which font is actually available on the system
         function detectAvailableFont() {
             const fontList = [
-                { name: 'Bank Gothic', display: 'Bank Gothic Bold' },
-                { name: 'BankGothic', display: 'BankGothic Bold' },
-                { name: 'Arial Narrow', display: 'Arial Narrow Bold' },
-                { name: 'Arial', display: 'Arial Bold' }
+                { name: 'Bank Gothic', display: 'Bank Gothic Bold', weight: 'bold' },
+                { name: 'BankGothic', display: 'BankGothic Bold', weight: 'bold' },
+                { name: 'Oswald', display: 'Oswald Bold (web font)', weight: '700' },
+                { name: 'Arial Narrow', display: 'Arial Narrow Bold', weight: 'bold' },
+                { name: 'Arial', display: 'Arial Bold', weight: 'bold' }
             ];
             const testString = 'abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
             const testSize = 72;
@@ -822,9 +823,9 @@
             ctx.font = `bold ${testSize}px monospace`;
             const fallbackWidth = ctx.measureText(testString).width;
             
-            // Test each font in the list (using bold weight)
+            // Test each font in the list (using specified weight)
             for (const font of fontList) {
-                ctx.font = `bold ${testSize}px "${font.name}", monospace`;
+                ctx.font = `${font.weight} ${testSize}px "${font.name}", monospace`;
                 const testWidth = ctx.measureText(testString).width;
                 
                 // If width differs, the font is available
@@ -846,7 +847,7 @@
                 fontStatusElement.textContent = detectedFont;
                 
                 // Color code based on font quality
-                if (detectedFont.includes('Bank Gothic') || detectedFont.includes('BankGothic')) {
+                if (detectedFont.includes('Oswald') || detectedFont.includes('Bank Gothic') || detectedFont.includes('BankGothic')) {
                     fontStatusElement.className = 'font-semibold text-green-600';
                 } else if (detectedFont.includes('Arial Narrow')) {
                     fontStatusElement.className = 'font-semibold text-yellow-600';

@@ -84,7 +84,7 @@ const SHIP_NAME_FONT_SIZE_PDF = 7.8;          // Font size in PDF in pixels (35%
 const SHIP_NAME_LINE_HEIGHT_MULTIPLIER = 1.2;
 const SHIP_NAME_MAX_WIDTH_SCREEN = 158;       // Maximum width in pixels (screen)
 const SHIP_NAME_MAX_WIDTH_PDF = 102.7;        // Maximum width in pixels (PDF)
-const SHIP_NAME_FONT_FAMILY = '"Bank Gothic", "BankGothic", "Arial Narrow", Arial, sans-serif';
+const SHIP_NAME_FONT_FAMILY = '"Bank Gothic", "BankGothic", "Oswald", "Arial Narrow", Arial, sans-serif';
 
 // Auto-placement settings
 const AUTO_PLACEMENT_PADDING = 10;  // Minimum padding between cards and canvas edges
