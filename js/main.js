@@ -34,6 +34,10 @@
         const pageList = document.getElementById('pageList');
         const currentPageNumber = document.getElementById('currentPageNumber');
         const totalPages = document.getElementById('totalPages');
+        const saveProjectBtn = document.getElementById('saveProjectBtn');
+        const loadProjectBtn = document.getElementById('loadProjectBtn');
+        const loadProjectInput = document.getElementById('loadProjectInput');
+        const autosaveStatus = document.getElementById('autosaveStatus');
         // Gallery elements removed per application.mdc - 2-section layout only
 
         // Initialize A4 dimensions
@@ -661,6 +665,9 @@
             if (currentImages.length === 0) {
                 a4EmptyState.style.display = 'flex';
             }
+
+            // Trigger autosave on UI changes
+            triggerAutosave();
         }
 
         // Process files wrapper - now uses external fileImporter module
@@ -681,11 +688,91 @@
             await generatePDF(pages, a4Dimensions, pixelsToMm);
         }
 
+        // Save/Load functionality
+        function handleSaveProject() {
+            const success = saveProjectToFile(pages, 'cardlayer-project');
+            if (success) {
+                // Also save to localStorage as autosave
+                saveProjectToLocalStorage(pages);
+                updateAutosaveStatus();
+            }
+        }
+
+        function handleLoadProject() {
+            loadProjectInput.click();
+        }
+
+        function handleLoadProjectFile(file) {
+            if (!file) return;
+
+            loadProjectFromFile(file, (projectData, error) => {
+                if (error) {
+                    alert('Error loading project: ' + error.message);
+                    return;
+                }
+
+                // Confirm if there's existing data
+                const totalImages = pages.reduce((sum, page) => sum + page.images.length, 0);
+                if (totalImages > 0) {
+                    if (!confirm('This will clear the current project. Do you want to continue?')) {
+                        return;
+                    }
+                }
+
+                // Clear current state
+                clearAllImages();
+
+                // Load project data
+                pages = projectData.pages;
+                currentPageIndex = 0;
+                nextPageId = Math.max(...pages.map(p => p.id), 0) + 1;
+
+                // Redraw current page
+                switchToPage(0);
+
+                console.log('Project loaded successfully', {
+                    pageCount: pages.length,
+                    totalImages: pages.reduce((sum, page) => sum + page.images.length, 0)
+                });
+
+                const totalCards = pages.reduce((sum, page) => sum + page.images.length, 0);
+                alert(`Project loaded: ${pages.length} page${pages.length !== 1 ? 's' : ''}, ${totalCards} card${totalCards !== 1 ? 's' : ''}`);
+            });
+        }
+
+        function updateAutosaveStatus() {
+            const autosaveInfo = checkAutosave();
+            if (autosaveInfo && autosaveStatus) {
+                const date = autosaveInfo.timestamp;
+                const timeStr = date ? date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '';
+                autosaveStatus.textContent = `Auto-saved: ${timeStr}`;
+                autosaveStatus.classList.remove('hidden');
+            }
+        }
+
+        // Auto-save on changes (debounced)
+        let autosaveTimer = null;
+        function triggerAutosave() {
+            clearTimeout(autosaveTimer);
+            autosaveTimer = setTimeout(() => {
+                saveProjectToLocalStorage(pages);
+                updateAutosaveStatus();
+            }, 2000); // Save 2 seconds after last change
+        }
+
         // Event listeners
         fileInput.onchange = (e) => handleProcessFiles(e.target.files);
         generatePdfBtn.onclick = handleGeneratePDF;
         clearAllBtn.onclick = clearAllImages;
         addPageBtn.onclick = addNewPage;
+        saveProjectBtn.onclick = handleSaveProject;
+        loadProjectBtn.onclick = handleLoadProject;
+        loadProjectInput.onchange = (e) => {
+            if (e.target.files.length > 0) {
+                handleLoadProjectFile(e.target.files[0]);
+                e.target.value = ''; // Reset input so same file can be loaded again
+            }
+        };
 
         // PDF Preview modal event listeners
         document.getElementById('exportPdfBtn').onclick = exportPDF;
@@ -764,12 +851,34 @@
             console.log('Detected font for ship names:', detectedFont);
         }
 
+        // Check for autosave on load
+        function checkAndLoadAutosave() {
+            const autosaveInfo = checkAutosave();
+            if (autosaveInfo) {
+                const date = autosaveInfo.timestamp;
+                const dateStr = date ? date.toLocaleString('en-US') : 'unknown';
+                
+                if (confirm(`An autosave was found (${dateStr}):\n${autosaveInfo.pageCount} page${autosaveInfo.pageCount !== 1 ? 's' : ''}, ${autosaveInfo.imageCount} card${autosaveInfo.imageCount !== 1 ? 's' : ''}\n\nDo you want to load it?`)) {
+                    const projectData = loadProjectFromLocalStorage();
+                    if (projectData) {
+                        pages = projectData.pages;
+                        currentPageIndex = 0;
+                        nextPageId = Math.max(...pages.map(p => p.id), 0) + 1;
+                        switchToPage(0);
+                        console.log('Autosave loaded successfully');
+                    }
+                }
+                updateAutosaveStatus();
+            }
+        }
+
         // Initialize
         window.onload = () => {
             initA4Dimensions();
             updateUI();
             updateFontStatus();
             updatePageList();
+            checkAndLoadAutosave();
         };
 
         // Event listeners

@@ -76,6 +76,23 @@
                     </div>
                 </div>
 
+                <!-- Save/Load Project -->
+                <div class="bg-gray-50 rounded-lg p-3">
+                    <h3 class="text-sm font-semibold text-gray-900 mb-2">Project</h3>
+                    <div class="space-y-2">
+                        <button id="saveProjectBtn" class="w-full px-4 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
+                            💾 Save Project
+                        </button>
+                        <input type="file" id="loadProjectInput" accept=".json" class="hidden">
+                        <button id="loadProjectBtn" class="w-full px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+                            📂 Load Project
+                        </button>
+                    </div>
+                    <div id="autosaveStatus" class="text-xs text-gray-500 text-center mt-2 hidden">
+                        <!-- Autosave status will be shown here -->
+                    </div>
+                </div>
+
                 <!-- Clear All -->
                 <button id="clearAllBtn" class="w-full px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors hidden">
                     Clear All Cards
@@ -196,6 +213,7 @@
     <script src="js/dragDrop.js"></script>
     <script src="js/fileImporter.js"></script>
     <script src="js/pdfGeneration.js"></script>
+    <script src="js/saveLoad.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>
