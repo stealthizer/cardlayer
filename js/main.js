@@ -819,7 +819,8 @@
             }
 
             // R key - Rotate image (only for non-dial cards)
-            if (e.key === 'r' || e.key === 'R') {
+            // Don't interfere with Cmd+R, Ctrl+R, or other modifier combinations
+            if ((e.key === 'r' || e.key === 'R') && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
                 e.preventDefault();
                 if (selectedImage.cardType !== 'inner-dial' && selectedImage.cardType !== 'front-dial') {
                     rotateImage(selectedImageId);
