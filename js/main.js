@@ -507,27 +507,42 @@
             totalPages.textContent = pages.length;
         }
 
-        // Remove image
+        // Remove image with undo/redo support
         function removeImage(id) {
-            const currentImages = getCurrentImages();
-            setCurrentImages(currentImages.filter(img => img.id !== id));
-            const element = document.querySelector(`[data-image-id="${id}"]`);
-            if (element) {
-                element.remove();
-            }
+            const command = new DeleteImageCommand(
+                id,
+                currentPageIndex,
+                getCurrentImages,
+                setCurrentImages,
+                (imageId) => {
+                    // Remove element function
+                    const element = document.querySelector(`[data-image-id="${imageId}"]`);
+                    if (element) {
+                        element.remove();
+                    }
 
-            // Clear selection if the removed image was selected
-            if (selectedImageId === id) {
-                selectedImageId = null;
-            }
+                    // Clear selection if the removed image was selected
+                    if (selectedImageId === imageId) {
+                        selectedImageId = null;
+                    }
 
-            // Show empty state if no images
-            if (getCurrentImages().length === 0) {
-                a4EmptyState.style.display = 'flex';
-            }
+                    // Show empty state if no images
+                    if (getCurrentImages().length === 0) {
+                        a4EmptyState.style.display = 'flex';
+                    }
+                },
+                (image) => {
+                    // Add element function (for undo)
+                    addImageToCanvas(image);
+                },
+                () => {
+                    // Update UI function
+                    updateUI();
+                    updatePageList();
+                }
+            );
 
-            updateUI();
-            updatePageList();
+            undoRedoManager.execute(command);
         }
 
         // Select image for keyboard shortcuts
@@ -763,14 +778,36 @@
         });
 
 
-        // Keyboard shortcuts for selected image
+        // Keyboard shortcuts for selected image and global shortcuts
         document.addEventListener('keydown', (e) => {
             // Don't trigger shortcuts if user is typing in an input field
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
                 return;
             }
 
-            // If no image is selected, ignore keyboard shortcuts
+            // Global undo/redo shortcuts (Ctrl+Z / Cmd+Z and Ctrl+Y / Cmd+Shift+Z)
+            const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+            const modifier = isMac ? e.metaKey : e.ctrlKey;
+
+            if (modifier && e.key === 'z' && !e.shiftKey) {
+                // Undo: Ctrl+Z (Windows/Linux) or Cmd+Z (Mac)
+                e.preventDefault();
+                if (undoRedoManager.undo()) {
+                    console.log('Undo performed');
+                }
+                return;
+            }
+
+            if (modifier && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+                // Redo: Ctrl+Y (Windows/Linux) or Cmd+Shift+Z (Mac) or Ctrl+Shift+Z (Windows/Linux)
+                e.preventDefault();
+                if (undoRedoManager.redo()) {
+                    console.log('Redo performed');
+                }
+                return;
+            }
+
+            // If no image is selected, ignore image-specific keyboard shortcuts
             if (!selectedImageId) {
                 return;
             }
