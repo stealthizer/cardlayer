@@ -110,16 +110,16 @@ async function processFiles(files, {
                         const originalWidthMm = pixelsToMm(originalWidthPx);
                         const originalHeightMm = pixelsToMm(originalHeightPx);
 
-                        cardDims = {
-                            width: originalWidthPx,
-                            height: originalHeightPx,
-                            isRotated: false,
-                            originalWidth: processedImg.width,
-                            originalHeight: processedImg.height,
-                            cardType: 'custom',
-                            cardWidthMm: originalWidthMm,
-                            cardHeightMm: originalHeightMm
-                        };
+                    cardDims = {
+                        widthPx: originalWidthPx,
+                        heightPx: originalHeightPx,
+                        widthMm: originalWidthMm,
+                        heightMm: originalHeightMm,
+                        isRotated: false,
+                        originalWidth: processedImg.width,
+                        originalHeight: processedImg.height,
+                        cardType: 'custom'
+                    };
                         console.log('✓ Custom card detected: using original dimensions', originalWidthPx + 'px × ' + originalHeightPx + 'px (' + originalWidthMm.toFixed(2) + 'mm × ' + originalHeightMm.toFixed(2) + 'mm)');
                     } else {
                         // Calculate proper card dimensions based on orientation detection and detected card type
@@ -131,10 +131,10 @@ async function processFiles(files, {
                         // Ensure 43mm × 43mm square dimensions
                         const dialSizeMm = 43;
                         const dialSizePx = mmToPixels(dialSizeMm);
-                        cardDims.cardWidthMm = dialSizeMm;
-                        cardDims.cardHeightMm = dialSizeMm;
-                        cardDims.width = dialSizePx;
-                        cardDims.height = dialSizePx;
+                        cardDims.widthMm = dialSizeMm;
+                        cardDims.heightMm = dialSizeMm;
+                        cardDims.widthPx = dialSizePx;
+                        cardDims.heightPx = dialSizePx;
                         cardDims.isRotated = false;
                         console.log('✓ Applied inner dial dimensions from "dial -" detection: 43mm × 43mm');
                     } else if (isUpgrade) {
@@ -143,10 +143,10 @@ async function processFiles(files, {
                         const upgradeHeightMm = 63.5;
                         const upgradeWidthPx = mmToPixels(upgradeWidthMm);
                         const upgradeHeightPx = mmToPixels(upgradeHeightMm);
-                        cardDims.cardWidthMm = upgradeWidthMm;
-                        cardDims.cardHeightMm = upgradeHeightMm;
-                        cardDims.width = upgradeWidthPx;
-                        cardDims.height = upgradeHeightPx;
+                        cardDims.widthMm = upgradeWidthMm;
+                        cardDims.heightMm = upgradeHeightMm;
+                        cardDims.widthPx = upgradeWidthPx;
+                        cardDims.heightPx = upgradeHeightPx;
                         cardDims.isRotated = false; // Upgrades are horizontal but not rotated
                         console.log('✓ Applied upgrade card dimensions: 88mm × 63.5mm (horizontal, not rotated)');
                     } else if (baseTileSize !== null && BASE_TILE_SIZE_MAP[baseTileSize]) {
@@ -162,12 +162,12 @@ async function processFiles(files, {
                             cardType: mappedCardType,
                             dimensionsMm: tileWidthMm + 'mm × ' + tileHeightMm + 'mm',
                             dimensionsPx: tileWidthPx.toFixed(2) + 'px × ' + tileHeightPx.toFixed(2) + 'px',
-                            before: { width: cardDims.width, height: cardDims.height, widthMm: cardDims.cardWidthMm, heightMm: cardDims.cardHeightMm }
+                            before: { widthPx: cardDims.widthPx, heightPx: cardDims.heightPx, widthMm: cardDims.widthMm, heightMm: cardDims.heightMm }
                         });
-                        cardDims.cardWidthMm = tileWidthMm;
-                        cardDims.cardHeightMm = tileHeightMm;
-                        cardDims.width = tileWidthPx;
-                        cardDims.height = tileHeightPx;
+                        cardDims.widthMm = tileWidthMm;
+                        cardDims.heightMm = tileHeightMm;
+                        cardDims.widthPx = tileWidthPx;
+                        cardDims.heightPx = tileHeightPx;
                         cardDims.isRotated = false; // Base tiles use card type dimensions, not rotated
                         console.log('✓ Applied base tile dimensions:', tileWidthMm + 'mm × ' + tileHeightMm + 'mm (' + tileWidthPx.toFixed(2) + 'px × ' + tileHeightPx.toFixed(2) + 'px)');
                     } else if (forceOrientation !== null && detectedCardType !== 'custom') {
@@ -177,64 +177,56 @@ async function processFiles(files, {
                         // Update dimensions if rotation was forced
                         if (forceOrientation) {
                             // Horizontal: swap width and height
-                            const tempWidth = cardDims.cardWidthMm;
-                            const tempHeight = cardDims.cardHeightMm;
-                            cardDims.cardWidthMm = tempHeight;
-                            cardDims.cardHeightMm = tempWidth;
-                            cardDims.width = mmToPixels(cardDims.cardWidthMm);
-                            cardDims.height = mmToPixels(cardDims.cardHeightMm);
+                            const tempWidth = cardDims.widthMm;
+                            const tempHeight = cardDims.heightMm;
+                            cardDims.widthMm = tempHeight;
+                            cardDims.heightMm = tempWidth;
+                            cardDims.widthPx = mmToPixels(cardDims.widthMm);
+                            cardDims.heightPx = mmToPixels(cardDims.heightMm);
                         } else {
                             // Vertical: ensure standard dimensions from CARD_TYPES
                             const cardTypeData = CARD_TYPES[detectedCardType];
                             if (cardTypeData) {
-                                cardDims.cardWidthMm = cardTypeData.width;
-                                cardDims.cardHeightMm = cardTypeData.height;
-                                cardDims.width = mmToPixels(cardDims.cardWidthMm);
-                                cardDims.height = mmToPixels(cardDims.cardHeightMm);
+                                cardDims.widthMm = cardTypeData.width;
+                                cardDims.heightMm = cardTypeData.height;
+                                cardDims.widthPx = mmToPixels(cardDims.widthMm);
+                                cardDims.heightPx = mmToPixels(cardDims.heightMm);
                             }
                         }
                     }
 
-                // Scale card dimensions to fit A4 layout
-                const cardWidthScaled = cardDims.width * a4Dimensions.scale;
-                const cardHeightScaled = cardDims.height * a4Dimensions.scale;
-
                 // Debug logging for base tiles
                 if (baseTileSize !== null) {
-                    console.log('Final scaled dimensions for base tile:', {
-                        baseSize: cardDims.width + 'px × ' + cardDims.height + 'px',
-                        scaledSize: cardWidthScaled.toFixed(2) + 'px × ' + cardHeightScaled.toFixed(2) + 'px',
-                        scale: a4Dimensions.scale,
-                        dimensionsMm: cardDims.cardWidthMm + 'mm × ' + cardDims.cardHeightMm + 'mm'
+                    console.log('Final dimensions for base tile:', {
+                        dimensionsMm: cardDims.widthMm + 'mm × ' + cardDims.heightMm + 'mm'
                     });
                 }
 
                     // Use processed image data URL
                     const processedDataUrl = processedImg.src || e.target.result;
 
+                // Store card coordinates in mm (logical units, independent of scale)
                 const image = {
                     id: Math.random().toString(36).substr(2, 9),
                         src: processedDataUrl,
                     name: file.name,
-                    x: 0, // Temporary, will be set by auto-placement
-                    y: 0, // Temporary, will be set by auto-placement
-                    width: cardWidthScaled,
-                    height: cardHeightScaled,
+                    xMm: 0, // Position in mm (will be set by auto-placement)
+                    yMm: 0, // Position in mm (will be set by auto-placement)
+                    widthMm: cardDims.widthMm, // Size in mm
+                    heightMm: cardDims.heightMm, // Size in mm
                         originalWidth: processedImg.width,
                         originalHeight: processedImg.height,
                     isRotated: cardDims.isRotated,
                         cardType: cardDims.cardType,
-                        cardWidthMm: cardDims.cardWidthMm,
-                        cardHeightMm: cardDims.cardHeightMm,
                         shipName: cardDims.cardType === 'front-dial' ? '' : undefined // Only front dials have ship names
                 };
 
-                // Auto-place image using smart grid-based positioning
-                const autoPosition = findBestAutoPlacementPosition(image, images, a4Dimensions);
-                image.x = autoPosition.x;
-                image.y = autoPosition.y;
+                // Auto-place image using smart grid-based positioning (in mm)
+                const autoPosition = findBestAutoPlacementPosition(image, images, A4_WIDTH_MM, A4_HEIGHT_MM);
+                image.xMm = autoPosition.x;
+                image.yMm = autoPosition.y;
 
-                console.log('Auto-placed image:', image.name, 'at', { x: image.x, y: image.y });
+                console.log('Auto-placed image:', image.name, 'at', { xMm: image.xMm, yMm: image.yMm }, 'size:', { widthMm: image.widthMm, heightMm: image.heightMm });
 
                 images.push(image);
                 addImageToCanvas(image);

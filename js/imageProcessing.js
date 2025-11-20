@@ -1,14 +1,24 @@
 // Image Processing Module
 // Contains reusable image processing functions with no UI dependencies
 
-// Convert mm to pixels
+// Convert mm to pixels (base pixels at 96 DPI, no scaling)
 function mmToPixels(mm) {
     return (mm * DPI) / 25.4;
 }
 
-// Convert pixels to mm
+// Convert pixels to mm (base pixels at 96 DPI, no scaling)
 function pixelsToMm(pixels) {
     return (pixels * 25.4) / DPI;
+}
+
+// Convert mm to scaled pixels for display (using current canvas scale)
+function mmToScaledPixels(mm, scale) {
+    return mmToPixels(mm) * scale;
+}
+
+// Convert scaled pixels to mm (using current canvas scale)
+function scaledPixelsToMm(scaledPixels, scale) {
+    return pixelsToMm(scaledPixels / scale);
 }
 
 // Detect if image has alpha channel
@@ -261,13 +271,13 @@ function calculateCardDimensions(originalWidth, originalHeight, cardType = 'stan
     const cardHeightPx = mmToPixels(cardHeight);
 
     return {
-        width: cardWidthPx,
-        height: cardHeightPx,
+        widthPx: cardWidthPx,
+        heightPx: cardHeightPx,
+        widthMm: cardWidth,
+        heightMm: cardHeight,
         isRotated: isRotated,
         originalWidth: originalWidth,
         originalHeight: originalHeight,
-        cardType: cardType,
-        cardWidthMm: cardWidth,
-        cardHeightMm: cardHeight
+        cardType: cardType
     };
 }

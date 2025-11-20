@@ -92,14 +92,20 @@
             }
         }
 
-        // Create image element for A4 layout
+        // Create image element for A4 layout (convert mm to scaled pixels)
         function createImageElement(image) {
+            // Convert mm to scaled pixels for display
+            const xPx = mmToScaledPixels(image.xMm, a4Dimensions.scale);
+            const yPx = mmToScaledPixels(image.yMm, a4Dimensions.scale);
+            const widthPx = mmToScaledPixels(image.widthMm, a4Dimensions.scale);
+            const heightPx = mmToScaledPixels(image.heightMm, a4Dimensions.scale);
+
             const container = document.createElement('div');
             container.className = 'image-container absolute cursor-move select-none group';
-            container.style.left = image.x + 'px';
-            container.style.top = image.y + 'px';
-            container.style.width = image.width + 'px';
-            container.style.height = image.height + 'px';
+            container.style.left = xPx + 'px';
+            container.style.top = yPx + 'px';
+            container.style.width = widthPx + 'px';
+            container.style.height = heightPx + 'px';
             container.dataset.imageId = image.id;
 
             const img = document.createElement('img');
@@ -193,7 +199,7 @@
 
                 // Position from the top of the image for screen display
                 const topOffsetMm = SHIP_NAME_TOP_OFFSET_SCREEN_MM;
-                const topOffsetPx = mmToPixels(topOffsetMm) * a4Dimensions.scale;
+                const topOffsetPx = mmToScaledPixels(topOffsetMm, a4Dimensions.scale);
                 
                 // Function to update text box position
                 const updateTextBoxPosition = (textarea) => {
@@ -290,15 +296,7 @@
 
         // Gallery functionality removed per application.mdc - 2-section layout only
         // Drag and drop functionality now in dragDrop.js
-
-        // Get effective dimensions for collision detection
-        // Note: width and height are already swapped during rotation, so just return them as-is
-        function getEffectiveDimensions(card) {
-            return {
-                width: card.width,
-                height: card.height
-            };
-        }
+        // getEffectiveDimensions now in dragDrop.js
 
         // Resize functionality removed per application.mdc - users cannot resize images
 
@@ -337,17 +335,11 @@
             // Toggle rotation state
             image.isRotated = !image.isRotated;
 
-            // Swap width and height for both display and PDF dimensions
-            const tempWidth = image.width;
-            const tempHeight = image.height;
-            image.width = tempHeight;
-            image.height = tempWidth;
-
-            // Swap card dimensions in mm (for PDF generation)
-            const tempWidthMm = image.cardWidthMm;
-            const tempHeightMm = image.cardHeightMm;
-            image.cardWidthMm = tempHeightMm;
-            image.cardHeightMm = tempWidthMm;
+            // Swap card dimensions in mm
+            const tempWidthMm = image.widthMm;
+            const tempHeightMm = image.heightMm;
+            image.widthMm = tempHeightMm;
+            image.heightMm = tempWidthMm;
 
             // Swap original dimensions
             const tempOriginalWidth = image.originalWidth;
@@ -364,26 +356,31 @@
                 image.rotatedSrc = null;
             }
 
-            // Adjust position to keep the card centered at the same point
+            // Adjust position to keep the card centered at the same point (in mm)
             // When rotating, the visual center shifts, so we need to compensate
-            const centerX = image.x + tempWidth / 2;
-            const centerY = image.y + tempHeight / 2;
-            image.x = centerX - image.width / 2;
-            image.y = centerY - image.height / 2;
+            const centerXMm = image.xMm + tempWidthMm / 2;
+            const centerYMm = image.yMm + tempHeightMm / 2;
+            image.xMm = centerXMm - image.widthMm / 2;
+            image.yMm = centerYMm - image.heightMm / 2;
 
-            // Constrain to A4 bounds
-            const effectiveDims = getEffectiveDimensions(image);
-            image.x = Math.max(0, Math.min(image.x, a4Dimensions.width - effectiveDims.width));
-            image.y = Math.max(0, Math.min(image.y, a4Dimensions.height - effectiveDims.height));
+            // Constrain to A4 bounds (in mm)
+            image.xMm = Math.max(0, Math.min(image.xMm, A4_WIDTH_MM - image.widthMm));
+            image.yMm = Math.max(0, Math.min(image.yMm, A4_HEIGHT_MM - image.heightMm));
 
             // Update DOM element
             const element = document.querySelector(`[data-image-id="${imageId}"]`);
             if (element) {
+                // Convert mm to scaled pixels for display
+                const widthPx = mmToScaledPixels(image.widthMm, a4Dimensions.scale);
+                const heightPx = mmToScaledPixels(image.heightMm, a4Dimensions.scale);
+                const xPx = mmToScaledPixels(image.xMm, a4Dimensions.scale);
+                const yPx = mmToScaledPixels(image.yMm, a4Dimensions.scale);
+
                 // Update container dimensions (swapped)
-                element.style.width = image.width + 'px';
-                element.style.height = image.height + 'px';
-                element.style.left = image.x + 'px';
-                element.style.top = image.y + 'px';
+                element.style.width = widthPx + 'px';
+                element.style.height = heightPx + 'px';
+                element.style.left = xPx + 'px';
+                element.style.top = yPx + 'px';
 
                 // Update image element with pre-rotated image
                 const imgElement = element.querySelector('img');
@@ -397,17 +394,16 @@
                 const rotationIndicator = element.querySelector('.control-top-left');
                 if (rotationIndicator) {
                     rotationIndicator.title = image.isRotated ?
-                        `Click to rotate back (${image.cardHeightMm}×${image.cardWidthMm}mm)` :
-                        `Click to rotate (${image.cardHeightMm}×${image.cardWidthMm}mm)`;
+                        `Click to rotate back (${image.heightMm}×${image.widthMm}mm)` :
+                        `Click to rotate (${image.heightMm}×${image.widthMm}mm)`;
                 }
             }
 
             console.log('Image rotated', {
                 imageId,
                 isRotated: image.isRotated,
-                dimensions: { width: image.width, height: image.height },
-                cardDimensions: { width: image.cardWidthMm, height: image.cardHeightMm },
-                position: { x: image.x, y: image.y }
+                dimensionsMm: { width: image.widthMm, height: image.heightMm },
+                positionMm: { x: image.xMm, y: image.yMm }
             });
         }
 
@@ -584,17 +580,21 @@
 
             console.log('Cloning image:', originalImage);
 
-            // Create a clone with a new ID and slightly offset position
+            // Convert pixel offsets to mm
+            const cloneOffsetXMm = pixelsToMm(CLONE_OFFSET_X);
+            const cloneOffsetYMm = pixelsToMm(CLONE_OFFSET_Y);
+
+            // Create a clone with a new ID and slightly offset position (in mm)
             const clonedImage = {
                 ...originalImage,
                 id: Math.random().toString(36).substr(2, 9),
-                x: originalImage.x + CLONE_OFFSET_X, // Offset to the right
-                y: originalImage.y + CLONE_OFFSET_Y  // Offset down
+                xMm: originalImage.xMm + cloneOffsetXMm, // Offset to the right
+                yMm: originalImage.yMm + cloneOffsetYMm  // Offset down
             };
 
-            // Ensure the clone stays within A4 bounds
-            clonedImage.x = Math.max(0, Math.min(clonedImage.x, a4Dimensions.width - clonedImage.width));
-            clonedImage.y = Math.max(0, Math.min(clonedImage.y, a4Dimensions.height - clonedImage.height));
+            // Ensure the clone stays within A4 bounds (in mm)
+            clonedImage.xMm = Math.max(0, Math.min(clonedImage.xMm, A4_WIDTH_MM - clonedImage.widthMm));
+            clonedImage.yMm = Math.max(0, Math.min(clonedImage.yMm, A4_HEIGHT_MM - clonedImage.heightMm));
 
             console.log('Cloned image data:', clonedImage);
 
@@ -843,14 +843,33 @@
         });
 
         window.onresize = () => {
+            // Recalculate A4 dimensions with new scale
             initA4Dimensions();
-            // Reposition all images on current page
+            
+            // Redraw all images on current page with new scale
+            // Images are stored in mm, so they will automatically scale correctly
             const currentImages = getCurrentImages();
             currentImages.forEach(image => {
                 const element = document.querySelector(`[data-image-id="${image.id}"]`);
                 if (element) {
-                    element.style.left = image.x + 'px';
-                    element.style.top = image.y + 'px';
+                    // Convert mm to scaled pixels with the new scale
+                    const xPx = mmToScaledPixels(image.xMm, a4Dimensions.scale);
+                    const yPx = mmToScaledPixels(image.yMm, a4Dimensions.scale);
+                    const widthPx = mmToScaledPixels(image.widthMm, a4Dimensions.scale);
+                    const heightPx = mmToScaledPixels(image.heightMm, a4Dimensions.scale);
+                    
+                    element.style.left = xPx + 'px';
+                    element.style.top = yPx + 'px';
+                    element.style.width = widthPx + 'px';
+                    element.style.height = heightPx + 'px';
+                    
+                    // Update ship name input position if present (front dials)
+                    const shipNameInput = element.querySelector('.ship-name-input');
+                    if (shipNameInput && image.cardType === 'front-dial') {
+                        const topOffsetMm = SHIP_NAME_TOP_OFFSET_SCREEN_MM;
+                        const topOffsetPx = mmToScaledPixels(topOffsetMm, a4Dimensions.scale);
+                        shipNameInput.style.top = topOffsetPx + 'px';
+                    }
                 }
             });
         };

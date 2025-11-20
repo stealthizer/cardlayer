@@ -159,13 +159,13 @@ async function createPDFDocument(pagesData, a4Dimensions, pixelsToMm) {
         // Process images sequentially to handle async operations
         for (const image of images) {
             try {
-                // Calculate position in mm (converting from scaled pixels back to mm)
-                const xMm = pixelsToMm(image.x / a4Dimensions.scale);
-                const yMm = pixelsToMm(image.y / a4Dimensions.scale);
+                // Position is already in mm
+                const xMm = image.xMm;
+                const yMm = image.yMm;
 
-                // Use the card dimensions directly (already in mm and correctly swapped if rotated)
-                const widthMm = image.cardWidthMm;
-                const heightMm = image.cardHeightMm;
+                // Dimensions are already in mm
+                const widthMm = image.widthMm;
+                const heightMm = image.heightMm;
 
                 // For dials, calculate proper dimensions based on image aspect ratio
                 let finalWidthMm = widthMm;
