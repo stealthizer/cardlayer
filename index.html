@@ -77,17 +77,6 @@
                     </div>
                 </div>
 
-                <!-- Font Status -->
-                <div class="bg-gray-50 rounded-lg p-3">
-                    <h3 class="text-sm font-semibold text-gray-900 mb-2">Ship Name Font</h3>
-                    <div id="fontStatus" class="text-xs text-gray-600 text-center">
-                        <span id="detectedFont" class="font-semibold text-blue-600">Detecting...</span>
-                    </div>
-                    <div class="text-xs text-gray-500 text-center mt-1">
-                        Used for front-dial cards
-                    </div>
-                </div>
-
                 <!-- Save/Load Project -->
                 <div class="bg-gray-50 rounded-lg p-3">
                     <h3 class="text-sm font-semibold text-gray-900 mb-2">Project</h3>
@@ -102,6 +91,17 @@
                     </div>
                     <div id="autosaveStatus" class="text-xs text-gray-500 text-center mt-2 hidden">
                         <!-- Autosave status will be shown here -->
+                    </div>
+                </div>
+
+                <!-- Font Status (only shown when front-dial cards exist) -->
+                <div id="fontStatusSection" class="bg-gray-50 rounded-lg p-3 hidden">
+                    <h3 class="text-sm font-semibold text-gray-900 mb-2">Ship Name Font</h3>
+                    <div id="fontStatus" class="text-xs text-gray-600 text-center">
+                        <span id="detectedFont" class="font-semibold text-blue-600">Detecting...</span>
+                    </div>
+                    <div class="text-xs text-gray-500 text-center mt-1">
+                        Used for front-dial cards
                     </div>
                 </div>
 

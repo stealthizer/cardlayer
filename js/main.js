@@ -37,6 +37,7 @@
         const loadProjectBtn = document.getElementById('loadProjectBtn');
         const loadProjectInput = document.getElementById('loadProjectInput');
         const autosaveStatus = document.getElementById('autosaveStatus');
+        const fontStatusSection = document.getElementById('fontStatusSection');
         // Gallery elements removed per application.mdc - 2-section layout only
 
         // Initialize A4 dimensions
@@ -662,6 +663,14 @@
 
             if (currentImages.length === 0) {
                 a4EmptyState.style.display = 'flex';
+            }
+
+            // Show/hide font status section based on front-dial cards existence
+            const hasFrontDialCards = pages.some(page => 
+                page.images.some(img => img.cardType === 'front-dial')
+            );
+            if (fontStatusSection) {
+                fontStatusSection.style.display = hasFrontDialCards ? 'block' : 'none';
             }
 
             // Trigger autosave on UI changes
