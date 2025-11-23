@@ -48,6 +48,12 @@ const CARD_TYPES = {
         width: 80.5,
         height: 224,
         description: '80.5mm × 224mm'
+    },
+    'ship-icon': {
+        name: 'Ship Icon',
+        width: 18,
+        height: 15,
+        description: '18mm × 15mm (black and white)'
     }
 };
 
@@ -95,4 +101,4 @@ const COLLISION_SEARCH_MAX_ATTEMPTS = 50;  // Maximum attempts to find valid pos
 const TEXT_CANVAS_SCALE = 2;  // Scale factor for crisp text rendering
 
 // Application metadata
-const LAST_UPDATED_DATE = '2025-11-20 23:59';  // Last update timestamp
+const LAST_UPDATED_DATE = '2025-11-23';  // Last update timestamp

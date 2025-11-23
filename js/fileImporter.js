@@ -88,6 +88,11 @@ async function processFiles(files, {
                         detectedCardType = 'standard'; // Use standard as base type
                         forceOrientation = false; // Not rotated
                         console.log('✓ Auto-detected upgrade from filename:', file.name, '→ 88mm × 63.5mm (horizontal, not rotated)');
+                    } else if (fileNameWithoutExt.startsWith('ixon')) {
+                        // Ship icons are small black and white images (18mm × 15mm)
+                        detectedCardType = 'ship-icon';
+                        forceOrientation = false; // Use dimensions as defined (18mm × 15mm)
+                        console.log('✓ Auto-detected ship icon from filename:', file.name, '→ 18mm × 15mm (black and white ship icon)');
                     }
 
                     // Apply circular cropping for inner dials
