@@ -69,11 +69,11 @@ async function processFiles(files, {
                         }
                     } else if (fileNameWithoutExt.startsWith('dial -') || (fileNameWithoutExt.startsWith('dial-') && !fileNameWithoutExt.startsWith('dial-front'))) {
                         // Detect "dial -" or "dial-" (but not "dial-front")
-                        // Apply inner dial treatment: 43mm × 43mm square with circular cropping
+                        // Apply inner dial treatment: 44mm × 44mm square with circular cropping
                         detectedCardType = 'inner-dial'; // Use inner-dial as base type
                         applyInnerDialTreatment = true;
                         forceOrientation = false; // Square, not rotated
-                        console.log('✓ Auto-detected dial from filename:', file.name, '→ 43mm × 43mm with inner dial treatment');
+                        console.log('✓ Auto-detected dial from filename:', file.name, '→ 44mm × 44mm with inner dial treatment');
                     } else if (fileNameWithoutExt.startsWith('dial-front')) {
                         detectedCardType = 'front-dial';
                         console.log('Auto-detected front-dial from filename:', file.name);
@@ -98,7 +98,7 @@ async function processFiles(files, {
                     // Apply circular cropping for inner dials
                     if (detectedCardType === 'inner-dial' || applyInnerDialTreatment) {
                         console.log('Applying circular cropping for inner dial...');
-                        processedImg = await cropImageToCircle(processedImg, 43); // 43mm diameter
+                        processedImg = await cropImageToCircle(processedImg, 44); // 44mm diameter
                         console.log('Circular cropping complete', {
                             original: { width: img.width, height: img.height },
                             cropped: { width: processedImg.width, height: processedImg.height }
@@ -134,7 +134,7 @@ async function processFiles(files, {
                     // Override dimensions if inner dial treatment is needed (from "dial -" detection)
                     if (applyInnerDialTreatment) {
                         // Ensure 43mm × 43mm square dimensions
-                        const dialSizeMm = 43;
+                        const dialSizeMm = 44;
                         const dialSizePx = mmToPixels(dialSizeMm);
                         cardDims.widthMm = dialSizeMm;
                         cardDims.heightMm = dialSizeMm;

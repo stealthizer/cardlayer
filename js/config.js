@@ -15,8 +15,8 @@ const CARD_TYPES = {
     },
     'small-ship': {
         name: 'Small Ship (X-Wing)',
-        width: 32,
-        height: 38,
+        width: 34,
+        height: 40,
         description: '32mm × 38mm'
     },
     'medium-ship': {
@@ -33,8 +33,8 @@ const CARD_TYPES = {
     },
     'inner-dial': {
         name: 'Inner Dial (X-Wing)',
-        width: 43,
-        height: 43,
+        width: 44,
+        height: 44,
         description: '43mm diameter (round)'
     },
     'front-dial': {
@@ -60,7 +60,7 @@ const CARD_TYPES = {
 // Base tile size mapping to existing card types
 // Maps size keywords to card types, using full dimensions (width × height)
 const BASE_TILE_SIZE_MAP = {
-    'small': 'small-ship',    // 32mm × 38mm
+    'small': 'small-ship',    // 34mm × 40mm
     'medium': 'medium-ship',  // 54mm × 61mm
     'large': 'large-ship',     // 73mm × 80mm
     'huge': 'huge-ship'       // 80.5 x 224mm
@@ -101,4 +101,4 @@ const COLLISION_SEARCH_MAX_ATTEMPTS = 50;  // Maximum attempts to find valid pos
 const TEXT_CANVAS_SCALE = 2;  // Scale factor for crisp text rendering
 
 // Application metadata
-const LAST_UPDATED_DATE = '2025-11-23';  // Last update timestamp
+const LAST_UPDATED_DATE = '2025-12-02';  // Last update timestamp
