@@ -82,7 +82,16 @@ async function processFiles(files, {
                         detectedCardType = 'standard'; // Use standard as base type
                         forceOrientation = false;
                         console.log('✓ Auto-detected pilot (vertical) from filename:', file.name, '→ 63.5mm × 88mm (vertical, not rotated)');
-                    } else if (fileNameWithoutExt.startsWith('upgrade')) {
+                    } else if (fileNameWithoutExt.startsWith('upgrade') ||
+                               fileNameWithoutExt.startsWith('modification') ||
+                               fileNameWithoutExt.startsWith('crew') ||
+                               fileNameWithoutExt.startsWith('talent') ||
+                               fileNameWithoutExt.startsWith('device') ||
+                               fileNameWithoutExt.startsWith('missile') ||
+                               fileNameWithoutExt.startsWith('astromech') ||
+                               fileNameWithoutExt.startsWith('cargo') ||
+                               fileNameWithoutExt.startsWith('sensor') ||
+                               fileNameWithoutExt.startsWith('torpedo')) {
                         // Upgrades are horizontal cards (88mm × 63.5mm, not rotated)
                         isUpgrade = true;
                         detectedCardType = 'standard'; // Use standard as base type
