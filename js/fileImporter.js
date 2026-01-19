@@ -34,7 +34,6 @@ async function processFiles(files, {
                     let forceOrientation = null; // null = auto-detect, false = vertical, true = horizontal
                     let baseTileSize = null; // null or one of: 'small', 'medium', 'large', 'huge'
                     let applyInnerDialTreatment = false; // Flag to apply circular cropping for "dial -" files
-                    let isUpgrade = false; // Flag for upgrade cards (88mm × 63.5mm, horizontal, not rotated)
                     const fileNameLower = file.name.toLowerCase();
 
                     // Check if filename starts with the keyword (followed by separator or end of name)
@@ -77,12 +76,8 @@ async function processFiles(files, {
                     } else if (fileNameWithoutExt.startsWith('dial-front')) {
                         detectedCardType = 'front-dial';
                         console.log('Auto-detected front-dial from filename:', file.name);
-                    } else if (fileNameWithoutExt.startsWith('pilot')) {
-                        // Pilots are vertical cards (not rotated)
-                        detectedCardType = 'standard'; // Use standard as base type
-                        forceOrientation = false;
-                        console.log('✓ Auto-detected pilot (vertical) from filename:', file.name, '→ 63.5mm × 88mm (vertical, not rotated)');
-                    } else if (fileNameWithoutExt.startsWith('upgrade') ||
+                    } else if (fileNameWithoutExt.startsWith('pilot') ||
+                               fileNameWithoutExt.startsWith('upgrade') ||
                                fileNameWithoutExt.startsWith('modification') ||
                                fileNameWithoutExt.startsWith('crew') ||
                                fileNameWithoutExt.startsWith('talent') ||
@@ -92,11 +87,11 @@ async function processFiles(files, {
                                fileNameWithoutExt.startsWith('cargo') ||
                                fileNameWithoutExt.startsWith('sensor') ||
                                fileNameWithoutExt.startsWith('torpedo')) {
-                        // Upgrades are horizontal cards (88mm × 63.5mm, not rotated)
-                        isUpgrade = true;
+                        // Standard card types are always imported as horizontal (88mm × 63.5mm)
+                        // This allows for more efficient layout (9 cards per page vs 8)
                         detectedCardType = 'standard'; // Use standard as base type
-                        forceOrientation = false; // Not rotated
-                        console.log('✓ Auto-detected upgrade from filename:', file.name, '→ 88mm × 63.5mm (horizontal, not rotated)');
+                        forceOrientation = true; // Force horizontal
+                        console.log('✓ Auto-detected standard card type from filename:', file.name, '→ 88mm × 63.5mm (horizontal)');
                     } else if (fileNameWithoutExt.startsWith('icon')) {
                         // Ship icons are small black and white images (18mm × 15mm)
                         detectedCardType = 'ship-icon';
@@ -151,18 +146,6 @@ async function processFiles(files, {
                         cardDims.heightPx = dialSizePx;
                         cardDims.isRotated = false;
                         console.log('✓ Applied inner dial dimensions from "dial -" detection: 43mm × 43mm');
-                    } else if (isUpgrade) {
-                        // Upgrade cards: 88mm × 63.5mm (horizontal, not rotated)
-                        const upgradeWidthMm = 88;
-                        const upgradeHeightMm = 63.5;
-                        const upgradeWidthPx = mmToPixels(upgradeWidthMm);
-                        const upgradeHeightPx = mmToPixels(upgradeHeightMm);
-                        cardDims.widthMm = upgradeWidthMm;
-                        cardDims.heightMm = upgradeHeightMm;
-                        cardDims.widthPx = upgradeWidthPx;
-                        cardDims.heightPx = upgradeHeightPx;
-                        cardDims.isRotated = false; // Upgrades are horizontal but not rotated
-                        console.log('✓ Applied upgrade card dimensions: 88mm × 63.5mm (horizontal, not rotated)');
                     } else if (baseTileSize !== null && BASE_TILE_SIZE_MAP[baseTileSize]) {
                         // Apply base tile dimensions using full card type dimensions (width × height)
                         const mappedCardType = BASE_TILE_SIZE_MAP[baseTileSize];
@@ -185,12 +168,12 @@ async function processFiles(files, {
                         cardDims.isRotated = false; // Base tiles use card type dimensions, not rotated
                         console.log('✓ Applied base tile dimensions:', tileWidthMm + 'mm × ' + tileHeightMm + 'mm (' + tileWidthPx.toFixed(2) + 'px × ' + tileHeightPx.toFixed(2) + 'px)');
                     } else if (forceOrientation !== null && detectedCardType !== 'custom') {
-                        // Override orientation if forced by filename detection (pilots/upgrades)
+                        // Override orientation if forced by filename detection
                         // Only apply if not a custom card type
                         cardDims.isRotated = forceOrientation;
                         // Update dimensions if rotation was forced
                         if (forceOrientation) {
-                            // Horizontal: swap width and height
+                            // Horizontal: swap width and height to get 88mm × 63.5mm
                             const tempWidth = cardDims.widthMm;
                             const tempHeight = cardDims.heightMm;
                             cardDims.widthMm = tempHeight;
