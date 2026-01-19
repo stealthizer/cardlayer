@@ -235,6 +235,31 @@ function cropImageToCircle(image, diameterMm) {
     });
 }
 
+// Rotate image 90 degrees clockwise
+function rotateImageData90Clockwise(image) {
+    return new Promise((resolve) => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Swap width and height for rotated canvas
+        canvas.width = image.height;
+        canvas.height = image.width;
+
+        // Clear canvas with transparent background
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Rotate 90 degrees clockwise
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate(Math.PI / 2);
+        ctx.drawImage(image, -image.width / 2, -image.height / 2);
+
+        // Convert to image with PNG format to preserve transparency
+        const rotatedImage = new Image();
+        rotatedImage.onload = () => resolve(rotatedImage);
+        rotatedImage.src = canvas.toDataURL('image/png');
+    });
+}
+
 // Detect card orientation and calculate proper dimensions
 function calculateCardDimensions(originalWidth, originalHeight, cardType = 'standard') {
     const cardTypeData = CARD_TYPES[cardType];

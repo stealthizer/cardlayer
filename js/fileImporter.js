@@ -109,6 +109,10 @@ async function processFiles(files, {
                         });
                     }
 
+                    // Store original dimensions before rotation
+                    const originalImgWidth = processedImg.width;
+                    const originalImgHeight = processedImg.height;
+
                     // Handle custom cards (use original image dimensions, no modifications)
                     let cardDims;
                     if (detectedCardType === 'custom') {
@@ -198,6 +202,16 @@ async function processFiles(files, {
                         dimensionsMm: cardDims.widthMm + 'mm × ' + cardDims.heightMm + 'mm'
                     });
                 }
+
+                    // Rotate image data if needed (for horizontal cards imported with forceOrientation)
+                    if (forceOrientation === true && cardDims.isRotated) {
+                        console.log('Rotating image data 90° clockwise for horizontal card...');
+                        processedImg = await rotateImageData90Clockwise(processedImg);
+                        console.log('Image rotation complete', {
+                            original: { width: originalImgWidth, height: originalImgHeight },
+                            rotated: { width: processedImg.width, height: processedImg.height }
+                        });
+                    }
 
                     // Use processed image data URL
                     const processedDataUrl = processedImg.src || e.target.result;
